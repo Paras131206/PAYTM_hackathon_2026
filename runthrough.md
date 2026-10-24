@@ -41,7 +41,7 @@ cd PAYTM_hackathon_2026
 cp .env.example .env
 ```
 
-Open `.env` (`open -e .env` on macOS) and set as many providers as you like. Each one you configure joins the failover chain:
+Open `.env` (`open -e .env` on macOS) and set as many providers as you like. Or set one key at a time without it showing on screen: `zsh scripts/set-key.sh GROQ_API_KEY` (works for any variable name). Each one you configure joins the failover chain:
 
 | Provider | Setting | Notes |
 |---|---|---|
