@@ -6,6 +6,7 @@ from typing import Literal
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import context as ctxsvc
@@ -80,6 +81,12 @@ def _start_run(ticket_id: str, engine: str, tasks: BackgroundTasks) -> int:
         raise HTTPException(409, str(e)) from e
     tasks.add_task(orchestrator.execute_run, run_id)
     return run_id
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    """The backend is an API; send a browser that opens it to the interactive docs instead of a bare 404."""
+    return RedirectResponse("/docs")
 
 
 @app.get("/api/health")

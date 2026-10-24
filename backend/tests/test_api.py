@@ -116,3 +116,8 @@ def test_message_is_not_stored_when_the_run_cannot_start(client, monkeypatch):
     r = client.post("/api/tickets/TKT-1001/messages", json={"body": "hello?", "engine": "llm"})
     assert r.status_code == 400
     assert len(client.get("/api/tickets/TKT-1001").json()["messages"]) == before   # a retry won't duplicate it
+
+
+def test_root_redirects_to_api_docs(client):
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == "/docs"
