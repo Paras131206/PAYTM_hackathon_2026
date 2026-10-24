@@ -106,7 +106,10 @@ class GeminiClient:
             except httpx.HTTPError as e:
                 raise LLMError("connection_error", f"Could not reach the Gemini API: {e}") from e
             if (r.status_code == 429 or r.status_code >= 500) and attempt < attempts - 1:
-                time.sleep(_retry_delay(r) or 2.0 * 2 ** attempt)
+                delay = _retry_delay(r)
+                if delay and delay > 60:  # e.g. a daily quota: waiting inside a run cannot help
+                    break
+                time.sleep(delay or 2.0 * 2 ** attempt)
                 continue
             break
         if r.status_code != 200:
@@ -132,11 +135,11 @@ class GeminiClient:
 
 
 def _retry_delay(r: httpx.Response) -> float | None:
-    """Seconds from a google.rpc.RetryInfo detail (e.g. "retryDelay": "23s"), capped so a run cannot stall."""
+    """Seconds from a google.rpc.RetryInfo detail (e.g. "retryDelay": "23s")."""
     try:
         for d in r.json()["error"].get("details", []):
             if str(d.get("@type", "")).endswith("RetryInfo"):
-                return min(float(str(d["retryDelay"]).rstrip("s")) + 0.5, 30.0)
+                return float(str(d["retryDelay"]).rstrip("s")) + 0.5
     except Exception:
         pass
     return None

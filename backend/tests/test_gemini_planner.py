@@ -150,3 +150,12 @@ def test_llm_failure_after_approval_queued_keeps_pending_approval(monkeypatch):
     assert out == "pending_approval"
     assert db.query_one("SELECT status, outcome FROM runs WHERE id = ?", (rid,)) == {"status": "failed",
                                                                                    "outcome": "pending_approval"}
+
+
+def test_daily_quota_fails_fast(monkeypatch):
+    slept = []
+    monkeypatch.setattr("app.agent.llm.time.sleep", slept.append)
+    daily = {"error": {"code": 429, "message": "You exceeded your current quota", "details": [
+        {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "79525s"}]}}
+    rid, out, seen = run_with([(429, daily)])
+    assert slept == [] and len(seen) == 1 and events(rid, "error")[0]["code"] == "rate_limited"

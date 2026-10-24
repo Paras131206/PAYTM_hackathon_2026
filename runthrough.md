@@ -128,7 +128,7 @@ cd PAYTM_hackathon_2026/backend
 .venv/bin/python -m pytest -q
 ```
 
-Expected: `84 passed`. The tests use a temporary database and **mocked** Claude and Gemini clients, so they make no network calls.
+Expected: `85 passed`. The tests use a temporary database and **mocked** Claude and Gemini clients, so they make no network calls.
 
 ```bash
 cd PAYTM_hackathon_2026/frontend
@@ -146,7 +146,7 @@ This runs the TypeScript type check and the production build.
 | `409 Ticket is escalated; a human owns it now` | This is by design. Use the Human queue, or reset the demo. |
 | Claude or Gemini option is greyed out | No key was present when the backend started. Set it in `.env` and restart the backend. |
 | Gemini `model_not_found` | The model name changed. Set `GEMINI_MODEL` to a model your key lists at https://aistudio.google.com. |
-| Gemini `rate_limited` | Free-tier quota. Wait, or lower the number of runs. |
+| Gemini `rate_limited` / "exceeded your current quota" | The free tier allows **20 requests per day per model**, and one ticket uses about 4–10. Switch `GEMINI_MODEL` to another model with its own quota (`gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`; note that `gemini-3.5-flash` shares 3.6-flash's quota), restart the backend, or enable billing in Google AI Studio. |
 | `model_not_found` or `bad_request` from Claude | Check `ANTHROPIC_MODEL`. Try `ANTHROPIC_REFUSAL_FALLBACK=0` if the beta header is rejected. |
 | `pip` fails building `pydantic-core` | Use Python 3.12–3.14 so a prebuilt wheel is available. |
 | Port in use | `lsof -i :8000` or `lsof -i :5173`, then stop the other process. |

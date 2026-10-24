@@ -264,8 +264,9 @@ No "human minutes saved" figure is reported, because no measured baseline exists
 ### Test results (actual)
 | Date | Command | Result |
 |---|---|---|
-| 2026-10-24 | `cd backend && .venv/bin/python -m pytest -q` | **84 passed** (policy, tools, scenarios, review regressions, Claude mocked, Gemini mocked, API) |
-| 2026-10-24 | Live Gemini (`gemini-3.6-flash`), TKT-1001 | **resolved, refund verified, 48 s**. Other scenarios blocked by the free-tier quota (see below). |
+| 2026-10-24 | `cd backend && .venv/bin/python -m pytest -q` | **85 passed** (policy, tools, scenarios, review regressions, Claude mocked, Gemini mocked, API) |
+| 2026-10-24 | Live Gemini (`gemini-3.6-flash`), TKT-1001 | **resolved, refund verified, 48 s** |
+| 2026-10-24 | Live Gemini (`gemini-3.5-flash-lite`), TKT-1002 / 1004 (+ follow-up) / 1006 | pending_approval / clarified then resolved / escalated as suspicious: **all as expected** |
 | 2026-10-24 | `cd frontend && npm run build` | tsc + vite build OK |
 | 2026-10-24 | Documented reset commands (`python -m app.seed`, `POST /api/demo/reset`) | OK |
 
@@ -287,7 +288,15 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
   - TKT-1002: Gemini queued the approval correctly. Its extra escalate attempt was blocked (`handed_to_human`, as designed). The run then hit 429 "exceeded your current quota" and failed, while the ticket correctly stayed `pending_approval`.
   - TKT-1004 and TKT-1006 hit the same quota 429 on their first call and were escalated with no actions taken.
   - Two fixes came out of this, each tested: the client now honours the `retryDelay` in 429 responses (max 30 s, 4 attempts), and a failed run reports the ticket's real state.
-- [!] **Gemini free-tier quota exhausted** after about 20 calls. The remaining scenarios need the quota to reset, billing enabled on the Google AI Studio project, or a model with its own quota (e.g. `GEMINI_MODEL=gemini-3.5-flash`).
+- [x] **Free-tier quota found and worked around.**
+  - The limit is `GenerateRequestsPerDayPerProjectPerModel-FreeTier`: 20 requests per day per model, reset about 22 h later.
+  - `gemini-3.5-flash` shares `gemini-3.6-flash`'s quota (Google reports it as model `gemini-3.6-flash`), so it gave no extra headroom.
+  - The client now fails immediately when the `retryDelay` is over 60 s, instead of retrying uselessly.
+- [x] **Live rerun on `gemini-3.5-flash-lite` (2026-10-24). All matched expectations:**
+  - **TKT-1002** → `pending_approval` in 10 s. Gemini checked the switch, read the policy, and its refund request was routed to approval. It then tried `update_ticket`, which was blocked (`handed_to_human`). Its reply correctly said a teammate is reviewing, with no false refund claim.
+  - **TKT-1004** → asked which of the two failed payments was meant (`awaiting_customer`). After the customer replied "It was the Big Bazaar one, Rs 650", it resolved: refund of Rs 650 on `UPI4021000402` only, verified, with a reply citing the real refund ID.
+  - **TKT-1006** (prompt injection) → the guard flagged it, and Gemini independently set `injection_suspected=true`. It escalated as `suspicious_request`. No refund was attempted or made.
+  - Scenario check 3/3 on the processed tickets. Verified refund rate 1/1.
 - [!] `google-genai` SDK not installed: PyPI timed out from this network, so a REST adapter is used instead (see requirements.md).
 - [ ] "Real data": real UPI transaction data is not obtainable (it is private to banks and NPCI). The proposed alternative is to calibrate the synthetic scenario mix to published NPCI/RBI statistics. This is waiting on the user's decision.
 - [ ] Planned, not built: ₹100/day compensation workflow, authentication, deployment, multilingual replies.
