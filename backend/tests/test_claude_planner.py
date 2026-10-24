@@ -8,7 +8,8 @@ import pytest
 from app import db
 from app.agent import orchestrator as orch
 from app.agent.llm import ClaudeClient, LLMError
-from app.agent.planners import ClaudePlanner
+from app.agent.planners import LLMPlanner
+from app.agent.providers import ClaudeProvider
 from app.config import settings
 
 from .conftest import FakeAnthropic, text, tool_use
@@ -16,8 +17,8 @@ from .conftest import FakeAnthropic, text, tool_use
 
 def run_with(script, ticket="TKT-1001"):
     fake = FakeAnthropic(script)
-    rid = orch.create_run(ticket, "claude")
-    out = orch.execute_run(rid, planner_factory=lambda _e: ClaudePlanner(ClaudeClient(client=fake)))
+    rid = orch.create_run(ticket, "llm")
+    out = orch.execute_run(rid, planner_factory=lambda _e: LLMPlanner([ClaudeProvider(ClaudeClient(client=fake))]))
     return rid, out, fake
 
 
@@ -37,8 +38,8 @@ def test_happy_path_multi_turn_tool_loop():
         (None, None),  # placeholder replaced below once we know the refund id
     ]
     fake = FakeAnthropic(script[:3])
-    rid = orch.create_run("TKT-1001", "claude")
-    planner = ClaudePlanner(ClaudeClient(client=fake))
+    rid = orch.create_run("TKT-1001", "llm")
+    planner = LLMPlanner([ClaudeProvider(ClaudeClient(client=fake))])
 
     def dynamic(**kw):
         fake.requests.append(copy.deepcopy(kw))
@@ -151,7 +152,8 @@ def test_missing_credentials(monkeypatch):
     with pytest.raises(LLMError) as e:
         ClaudeClient()
     assert e.value.code == "missing_credentials"
-    rid = orch.create_run("TKT-1001", "claude")
+    monkeypatch.setattr(settings, "llm_providers", ["claude"])
+    rid = orch.create_run("TKT-1001", "llm")
     assert orch.execute_run(rid) == "escalated"
     assert db.query_one("SELECT status FROM runs WHERE id = ?", (rid,))["status"] == "failed"
 
@@ -169,6 +171,6 @@ def test_unexpected_stop_reason_fails_run():
     assert out == "escalated" and events(rid, "error")[0]["code"] == "unexpected_stop"
 
 
-def test_pause_turn_loop_is_bounded():
-    rid, out, fake = run_with([([text("..")], "pause_turn")] * 3)
-    assert events(rid, "error")[0]["code"] == "pause_loop" and len(fake.requests) == 3
+def test_pause_turn_is_unexpected_without_server_tools():
+    rid, out, fake = run_with([([text("..")], "pause_turn")])
+    assert events(rid, "error")[0]["code"] == "unexpected_stop" and len(fake.requests) == 1

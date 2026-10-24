@@ -97,6 +97,8 @@ function title(ev: RunEvent): { t: string; tone: string; body?: string } {
       return { t: "Planner note", tone: "neutral", body: p.text };
     case "error":
       return { t: `Error (${p.source}): ${p.code}`, tone: "bad", body: `${p.message}${p.note ? ` — ${p.note}` : ""}` };
+    case "llm_failover":
+      return { t: `Switched LLM: ${p.from} → ${p.to}`, tone: "warn", body: `${p.code}: ${p.message}` };
     case "human_decision":
       return { t: `Human decision: ${p.decision}`, tone: "ok", body: p.note || undefined };
     case "ticket_update":

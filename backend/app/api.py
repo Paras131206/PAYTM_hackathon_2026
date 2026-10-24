@@ -11,7 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from . import context as ctxsvc
 from . import db, handoffs, metrics, seed
 from .agent import orchestrator
-from .config import claude_credentials_present, engine_configured, gemini_api_key, iso, model_for, settings, utcnow
+from .agent.providers import chain_label, configured_chain, model_of, provider_configured
+from .config import iso, settings, utcnow
 from .tools import adapters
 from .tools.registry import TOOLS
 
@@ -34,7 +35,7 @@ class _Body(BaseModel):
 
 
 class RunRequest(_Body):
-    engine: Literal["claude", "gemini", "rules"] | None = None
+    engine: Literal["llm", "rules"] | None = None
 
 
 class MessageRequest(_Body):
@@ -63,10 +64,9 @@ class FaultRequest(_Body):
 
 def _engine_or_400(requested: str | None) -> str:
     engine = requested or settings.resolved_engine
-    if not engine_configured(engine):
-        key = "ANTHROPIC_API_KEY" if engine == "claude" else "GEMINI_API_KEY"
-        raise HTTPException(400, f"The {engine} engine is not configured ({key} is missing). "
-                                 "Use engine 'rules' or set the key and restart.")
+    if engine == "llm" and not configured_chain():
+        raise HTTPException(400, "No LLM provider is configured (set a key such as GEMINI_API_KEY or GROQ_API_KEY, "
+                                 "or OLLAMA_MODEL, in .env and restart). Use engine 'rules' meanwhile.")
     return engine
 
 
@@ -89,9 +89,8 @@ def health() -> dict:
         "time": iso(utcnow()),
         "engine": settings.resolved_engine,
         "engine_setting": settings.agent_engine,
-        "claude_configured": claude_credentials_present(),
-        "gemini_configured": bool(gemini_api_key()),
-        "model": model_for(settings.resolved_engine),
+        "llm_configured": bool(configured_chain()),
+        "model": chain_label() if settings.resolved_engine == "llm" else None,
     }
 
 
@@ -100,18 +99,17 @@ def system() -> dict:
     return {
         "engine": settings.resolved_engine,
         "engine_setting": settings.agent_engine,
-        "claude_configured": claude_credentials_present(),
-        "gemini_configured": bool(gemini_api_key()),
-        "model": model_for(settings.resolved_engine) or "—",
-        "effort": settings.anthropic_effort,
+        "llm_configured": bool(configured_chain()),
+        "model": chain_label() or "—",
+        "providers": [{"name": n, "model": model_of(n), "configured": provider_configured(n), "order": i + 1}
+                      for i, n in enumerate(settings.llm_providers)],
         "auto_refund_limit_rupees": settings.auto_refund_limit_paise / 100,
         "max_agent_turns": settings.max_agent_turns,
         "tool_max_attempts": settings.tool_max_attempts,
         "integrations": [
-            {"name": "Claude (Anthropic API)", "mode": "live" if claude_credentials_present() else "not configured",
-             "detail": f"Planner for engine=claude ({settings.anthropic_model}). Live only when ANTHROPIC_API_KEY is set."},
-            {"name": "Gemini (Google Generative Language API)", "mode": "live" if gemini_api_key() else "not configured",
-             "detail": f"Planner for engine=gemini ({settings.gemini_model}). Live only when GEMINI_API_KEY is set."},
+            *[{"name": f"LLM: {n}", "mode": "live" if provider_configured(n) else "not configured",
+               "detail": f"{model_of(n)}. Position {i + 1} in the failover chain (LLM_PROVIDERS)."}
+              for i, n in enumerate(settings.llm_providers)],
             {"name": "Payment switch", "mode": "sandbox",
              "detail": "Simulated UPI switch backed by SQLite. No bank or NPCI connection."},
             {"name": "Refund ledger", "mode": "sandbox", "detail": "Simulated refund rail. No money moves."},

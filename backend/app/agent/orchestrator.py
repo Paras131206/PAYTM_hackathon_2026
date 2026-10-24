@@ -8,10 +8,11 @@ from typing import Any, Callable
 
 from .. import context as ctxsvc
 from .. import db, guards
-from ..config import iso, model_for, parse_iso, settings, utcnow
+from ..config import iso, parse_iso, settings, utcnow
 from ..tools.registry import RunContext, execute
 from .llm import LLMError
 from .planners import make_planner
+from .providers import chain_label
 
 ACTIVE_RUN_STATUSES = ("queued", "running")
 AGENT_RUNNABLE_TICKET_STATUSES = {"open", "in_progress", "awaiting_customer", "waiting_on_bank"}
@@ -35,7 +36,7 @@ def create_run(ticket_id: str, engine: str) -> int:
     ticket = ctxsvc.get_ticket(ticket_id)
     if ticket["status"] not in AGENT_RUNNABLE_TICKET_STATUSES:
         raise RunConflict(f"Ticket is {ticket['status']}; a human owns it now.")
-    model = model_for(engine)
+    model = chain_label() if engine == "llm" else None
     with db.tx() as c:
         active = c.execute(
             "SELECT id FROM runs WHERE ticket_id = ? AND status IN ('queued','running')", (ticket_id,)
@@ -47,6 +48,12 @@ def create_run(ticket_id: str, engine: str) -> int:
             (ticket_id, engine, model, "queued", iso(utcnow())),
         )
         return int(cur.lastrowid)
+
+
+def _set_run_model(run_id: int, model: str) -> None:
+    """Record which models actually answered (changes when the chain fails over)."""
+    with db.tx() as c:
+        c.execute("UPDATE runs SET model = ? WHERE id = ?", (model, run_id))
 
 
 def _finish(run_id: int, status: str, outcome: str, turns: int, error: str | None = None) -> None:
@@ -90,6 +97,10 @@ def execute_run(run_id: int, planner_factory: Callable[[str], Any] | None = None
         for _ in range(settings.max_agent_turns):
             turn = planner.next(results)
             turns += 1
+            for kind, payload in turn.events:
+                ctx.emit(kind, payload)
+            if turn.answered_by:
+                _set_run_model(run_id, planner.model)
             if turn.note:
                 ctx.emit("planner_note", {"text": turn.note[:2000]})
             if turn.done:
@@ -104,6 +115,8 @@ def execute_run(run_id: int, planner_factory: Callable[[str], Any] | None = None
         _finish(run_id, "finished", outcome, turns)
         return outcome
     except LLMError as e:
+        for kind, payload in getattr(e, "events", []):
+            ctx.emit(kind, payload)
         return _fail(ctx, turns, "llm", e.code, str(e), "tool_failure")
     except Exception as e:  # unexpected bug: record it, escalate, never pretend success
         return _fail(ctx, turns, "orchestrator", type(e).__name__, str(e), "other")

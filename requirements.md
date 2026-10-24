@@ -4,6 +4,8 @@ The real manifests are `backend/requirements.txt` (Python) and `frontend/package
 
 ## Runtimes
 
+Optional: the **Ollama** app (tested 0.40.5) for the local LLM provider.
+
 | Runtime | Tested version | Notes |
 |---|---|---|
 | Python | 3.14.8 (macOS arm64) | Use 3.12 or newer. The code uses modern typing syntax. Python 3.14 needs pydantic 2.12 or newer, which ships the 3.14 wheels. |
@@ -21,12 +23,12 @@ No database server is needed. SQLite is part of the Python standard library.
 | pydantic | ==2.14.1 | Typed tool input schemas, API bodies | `tools/registry.py`, `api.py` | v2 API (`model_validate`, `ConfigDict`). |
 | anthropic | ==2.3.0 | Official Claude SDK | `agent/llm.py` only | Built on `httpx2`. This is the only module that imports it. |
 | python-dotenv | ==1.2.4 | Loads `.env` from the repo root | `app/config.py` | Real environment variables take precedence. |
-| httpx | ==0.28.1 | Gemini REST adapter, and `fastapi.testclient` | `agent/llm.py`, `tests/` | The anthropic SDK uses `httpx2`, a separate package. |
+| httpx | ==0.28.1 | Gemini and OpenAI-compatible (Groq, Cerebras, Ollama) clients, and `fastapi.testclient` | `agent/llm.py`, `tests/` | The anthropic SDK uses `httpx2`, a separate package. |
 | pytest | ==9.1.1 | Test runner | `backend/tests/` | Test-only. |
 
 **Why no Google SDK:** `pip install google-genai` timed out repeatedly against PyPI from the build machine. The Gemini adapter therefore calls the documented REST endpoint (`v1beta/models/{model}:generateContent`) through `httpx`, which was already a dependency. Switching to the SDK later only touches `GeminiClient` in `agent/llm.py`.
 
-Not used on purpose: SQLAlchemy (plain `sqlite3` is enough for this schema), agent frameworks (the tool loop is about 60 lines and fully visible), vector databases (context is fetched by indexed SQL lookups), pandas.
+Not used on purpose: the `openai` SDK (Groq, Cerebras and Ollama are called with plain `httpx`; the request is one JSON POST), SQLAlchemy (plain `sqlite3` is enough for this schema), agent frameworks (the tool loop is about 60 lines and fully visible), vector databases (context is fetched by indexed SQL lookups), pandas.
 
 ### Install
 

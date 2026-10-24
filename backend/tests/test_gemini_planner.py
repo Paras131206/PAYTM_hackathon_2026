@@ -7,7 +7,8 @@ import pytest
 from app import db
 from app.agent import orchestrator as orch
 from app.agent.llm import GeminiClient, LLMError
-from app.agent.planners import GeminiPlanner
+from app.agent.planners import LLMPlanner
+from app.agent.providers import GeminiProvider
 
 KEY = "test-key-not-real"
 
@@ -33,8 +34,8 @@ def run_with(responses, ticket="TKT-1001"):
         return httpx.Response(status, json=body)
 
     client = GeminiClient(http=httpx.Client(transport=httpx.MockTransport(handler)), api_key=KEY)
-    rid = orch.create_run(ticket, "gemini")
-    out = orch.execute_run(rid, planner_factory=lambda _e: GeminiPlanner(client))
+    rid = orch.create_run(ticket, "llm")
+    out = orch.execute_run(rid, planner_factory=lambda _e: LLMPlanner([GeminiProvider(client)]))
     return rid, out, seen
 
 

@@ -198,11 +198,8 @@ function Workspace({ ticketId, health, onChange }: { ticketId: string; health: H
             <label className="small muted" htmlFor="engine">Engine</label>
             <select id="engine" className="input" style={{ width: "auto" }} value={engine}
               onChange={(e) => setEngine(e.target.value as Engine)}>
-              <option value="claude" disabled={!health?.claude_configured}>
-                Claude{health?.claude_configured ? "" : " (no API key)"}
-              </option>
-              <option value="gemini" disabled={!health?.gemini_configured}>
-                Gemini{health?.gemini_configured ? "" : " (no API key)"}
+              <option value="llm" disabled={!health?.llm_configured}>
+                LLM with failover{health?.llm_configured ? "" : " (no provider configured)"}
               </option>
               <option value="rules">Rules engine (no LLM)</option>
             </select>

@@ -49,11 +49,10 @@ def test_request_validation(client):
     assert client.post("/api/tickets/TKT-1001/messages", json={"body": "x", "admin": True}).status_code == 422
 
 
-def test_claude_engine_without_key_is_refused_explicitly(client, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
-    r = client.post("/api/tickets/TKT-1001/runs", json={"engine": "claude"})
-    assert r.status_code == 400 and "not configured" in r.json()["detail"]
+def test_llm_engine_without_any_provider_is_refused_explicitly(client, monkeypatch):
+    monkeypatch.setattr(settings, "llm_providers", [])
+    r = client.post("/api/tickets/TKT-1001/runs", json={"engine": "llm"})
+    assert r.status_code == 400 and "No LLM provider is configured" in r.json()["detail"]
     assert db.query("SELECT * FROM runs") == []
 
 

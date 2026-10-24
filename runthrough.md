@@ -7,8 +7,7 @@ This guide takes you from a clean checkout to a running demo. Commands assume ma
 | Part | Status |
 |---|---|
 | Agent loop, policy engine, tool registry, verification, audit trail, approvals, metrics | **Real and working** (local) |
-| Gemini planner (`engine=gemini`) | **Real integration** (Gemini REST API), used when `GEMINI_API_KEY` is set. **Not yet tested with a live key on this machine.** |
-| Claude planner (`engine=claude`) | **Real integration**, used when `ANTHROPIC_API_KEY` is set. **Not yet tested with a live key on this machine.** |
+| LLM planner (`engine=llm`) with failover | **Real.** Providers are tried in `LLM_PROVIDERS` order (default gemini → groq → cerebras → ollama → claude). Only configured ones join the chain. **Tested live:** Gemini, and a real Gemini 429 failing over to local Ollama mid-run. Groq, Cerebras and Claude are implemented and mock-tested, but have no live key yet. |
 | Rules planner (`engine=rules`) | **Real**, deterministic, no LLM. Always labelled in the UI. |
 | Payment switch status | **Sandbox**: reads ground truth from SQLite. Supports injected outages and timeouts. |
 | Refund rail | **Sandbox**: writes a refund row and marks the transaction reversed. **No money moves.** |
@@ -35,21 +34,26 @@ cd PAYTM_hackathon_2026/frontend
 npm ci
 ```
 
-## 4. Configure a real LLM (Gemini or Claude)
+## 4. Configure real LLMs (with automatic failover)
 
 ```bash
 cd PAYTM_hackathon_2026
 cp .env.example .env
 ```
 
-Open `.env` (`open -e .env` on macOS) and set **one** key:
+Open `.env` (`open -e .env` on macOS) and set as many providers as you like. Each one you configure joins the failover chain:
 
-- **Gemini:** `GEMINI_API_KEY=...`. Get a key at https://aistudio.google.com/apikey; the free tier has rate limits. The model comes from `GEMINI_MODEL` (default `gemini-3.6-flash`; the newest `gemini-3.8-flash` was overloaded when tested).
-- **Claude:** `ANTHROPIC_API_KEY=...`, from console.anthropic.com; this is paid.
+| Provider | Setting | Notes |
+|---|---|---|
+| Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` | Key from https://aistudio.google.com/apikey. The free tier allows **20 requests/day per model**. |
+| Groq | `GROQ_API_KEY`, `GROQ_MODEL` | Free tier, https://console.groq.com/keys |
+| Cerebras | `CEREBRAS_API_KEY`, `CEREBRAS_MODEL` | Free tier, https://cloud.cerebras.ai |
+| Ollama | `OLLAMA_MODEL` (empty = off) | Runs locally, free, works offline. Needs the Ollama app running. Small models (3B) handle the tools poorly; use 7B or larger. |
+| Claude | `ANTHROPIC_API_KEY` | Paid. |
 
-With `AGENT_ENGINE=auto` (the default), the backend picks Claude if its key is set, else Gemini, else the rules engine. It decides **once, at startup**. To force one engine, set `AGENT_ENGINE=gemini`. **Restart the backend after you edit `.env`.** The top bar then shows `Gemini · <model>`.
+`LLM_PROVIDERS` sets the order. On a **quota (429), timeout, outage or bad key**, the run switches to the next configured provider *mid-ticket*. The timeline shows "Switched LLM: A → B", and the run's model column lists every model that answered. It moves **forward only**. A **refusal never triggers a switch.** If every provider fails, the run is marked failed and the ticket is escalated. It never drops to the rules engine silently.
 
-If an LLM call fails (bad key, rate limit, timeout, safety block), that run is marked **failed** and the ticket is escalated. It never switches to the rules engine silently. On the Gemini free tier, `rate_limited` errors usually mean you should wait a minute and run again.
+With `AGENT_ENGINE=auto` (the default), the backend uses the LLM chain if any provider is configured, else the rules engine, decided once at startup. **Restart the backend after you edit `.env`.**
 
 ## 5. Start
 
@@ -128,7 +132,7 @@ cd PAYTM_hackathon_2026/backend
 .venv/bin/python -m pytest -q
 ```
 
-Expected: `85 passed`. The tests use a temporary database and **mocked** Claude and Gemini clients, so they make no network calls.
+Expected: `91 passed`. The tests use a temporary database and **mocked** provider clients (Claude, Gemini, OpenAI-compatible), so they make no network calls.
 
 ```bash
 cd PAYTM_hackathon_2026/frontend
@@ -144,7 +148,8 @@ This runs the TypeScript type check and the production build.
 | Top bar says "backend unreachable" | Start the backend on port 8000. Check `curl http://127.0.0.1:8000/api/health`. |
 | `409 Run … already in progress` | Wait for the current run to finish. Only one run per ticket can be active. |
 | `409 Ticket is escalated; a human owns it now` | This is by design. Use the Human queue, or reset the demo. |
-| Claude or Gemini option is greyed out | No key was present when the backend started. Set it in `.env` and restart the backend. |
+| "LLM with failover" is greyed out | No provider was configured when the backend started. Set a key (or `OLLAMA_MODEL`) in `.env` and restart the backend. |
+| Ollama: `connection_error` | Start the Ollama app (`ollama serve`) and pull the model: `ollama pull <OLLAMA_MODEL>`. |
 | Gemini `model_not_found` | The model name changed. Set `GEMINI_MODEL` to a model your key lists at https://aistudio.google.com. |
 | Gemini `rate_limited` / "exceeded your current quota" | The free tier allows **20 requests per day per model**, and one ticket uses about 4–10. Switch `GEMINI_MODEL` to another model with its own quota (`gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`; note that `gemini-3.5-flash` shares 3.6-flash's quota), restart the backend, or enable billing in Google AI Studio. |
 | `model_not_found` or `bad_request` from Claude | Check `ANTHROPIC_MODEL`. Try `ANTHROPIC_REFUSAL_FALLBACK=0` if the beta header is rejected. |

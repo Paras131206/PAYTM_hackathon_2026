@@ -67,7 +67,7 @@ class ClaudeClient:
             raise LLMError("refusal", "The model declined this request.")
         if stop == "max_tokens":
             raise LLMError("truncated", "The model response hit max_tokens.")
-        if stop not in {"end_turn", "tool_use", "stop_sequence", "pause_turn"}:
+        if stop not in {"end_turn", "tool_use", "stop_sequence"}:  # no server tools, so pause_turn is unexpected
             raise LLMError("unexpected_stop", f"Model stopped with {stop!r}; treating the run as failed.")
         return response
 
@@ -148,5 +148,63 @@ def _retry_delay(r: httpx.Response) -> float | None:
 def _gemini_error_message(r: httpx.Response) -> str:
     try:
         return r.json()["error"]["message"]
+    except Exception:
+        return r.text[:300]
+
+
+# ---------------------------------------------------------------------------------- OpenAI-compatible (Groq etc.)
+class OpenAICompatClient:
+    """POST {base_url}/chat/completions. Groq, Cerebras and Ollama all speak this format."""
+
+    def __init__(self, *, name: str, base_url: str, model: str, api_key: str = "", timeout_s: float = 90,
+                 http: httpx.Client | None = None):
+        self.name, self.model = name, model
+        self._url = base_url.rstrip("/") + "/chat/completions"
+        self._headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+        self._http = http or httpx.Client(timeout=timeout_s)
+
+    def create(self, *, messages: list[dict], tools: list[dict]) -> dict:
+        body = {"model": self.model, "messages": messages, "tools": tools, "tool_choice": "auto"}
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                r = self._http.post(self._url, json=body, headers=self._headers)
+            except httpx.TimeoutException as e:
+                raise LLMError("timeout", f"The {self.name} request timed out.") from e
+            except httpx.HTTPError as e:
+                raise LLMError("connection_error", f"Could not reach {self.name}: {e}") from e
+            if (r.status_code == 429 or r.status_code >= 500) and attempt < attempts - 1:
+                delay = _retry_after(r)
+                if delay and delay > 60:  # quota window too long to wait inside a run
+                    break
+                time.sleep(delay or 2.0 * 2 ** attempt)
+                continue
+            break
+        if r.status_code != 200:
+            code = {400: "bad_request", 401: "auth_failed", 403: "auth_failed", 404: "model_not_found",
+                    429: "rate_limited"}.get(r.status_code, "api_error")
+            raise LLMError(code, f"{self.name} API error {r.status_code}: {_openai_error_message(r)}")
+        choice = (r.json().get("choices") or [{}])[0]
+        finish = choice.get("finish_reason")
+        if finish == "length":
+            raise LLMError("truncated", f"The {self.name} response hit its token limit.")
+        if finish == "content_filter":
+            raise LLMError("refusal", f"{self.name} blocked the response (content_filter).")
+        if finish not in {"stop", "tool_calls", None}:
+            raise LLMError("unexpected_stop", f"{self.name} stopped with {finish!r}; treating the run as failed.")
+        return choice.get("message") or {}
+
+
+def _retry_after(r: httpx.Response) -> float | None:
+    try:
+        return float(r.headers["retry-after"])
+    except (KeyError, ValueError):
+        return None
+
+
+def _openai_error_message(r: httpx.Response) -> str:
+    try:
+        err = r.json()["error"]
+        return err["message"] if isinstance(err, dict) else str(err)
     except Exception:
         return r.text[:300]

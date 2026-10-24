@@ -1,6 +1,6 @@
 // Mirrors the FastAPI response shapes in backend/app/api.py.
 
-export type Engine = "claude" | "gemini" | "rules";
+export type Engine = "llm" | "rules";
 
 export type TicketStatus =
   | "open" | "in_progress" | "awaiting_customer" | "waiting_on_bank"
@@ -72,7 +72,7 @@ export interface Message {
 export interface Run {
   id: number;
   ticket_id: string;
-  engine: "claude" | "gemini" | "rules" | "human";
+  engine: Engine | "human";
   model: string | null;
   status: "queued" | "running" | "finished" | "failed";
   outcome: string | null;
@@ -167,18 +167,16 @@ export interface Health {
   status: string;
   engine: Engine;
   engine_setting: string;
-  claude_configured: boolean;
-  gemini_configured: boolean;
+  llm_configured: boolean;
   model: string | null;
 }
 
 export interface SystemInfo {
   engine: string;
   engine_setting: string;
-  claude_configured: boolean;
-  gemini_configured: boolean;
+  llm_configured: boolean;
   model: string;
-  effort: string;
+  providers: { name: string; model: string; configured: boolean; order: number }[];
   auto_refund_limit_rupees: number;
   max_agent_turns: number;
   tool_max_attempts: number;

@@ -445,6 +445,12 @@ def gemini_tool_definitions() -> list[dict[str, Any]]:
     return [{"functionDeclarations": decls}]
 
 
+def openai_tool_definitions() -> list[dict[str, Any]]:
+    """OpenAI-compatible tools (Groq, Cerebras, Ollama)."""
+    return [{"type": "function", "function": {"name": s.name, "description": s.description,
+                                              "parameters": _strict_schema(s.input_model)}} for s in TOOLS.values()]
+
+
 def anthropic_tool_definitions() -> list[dict[str, Any]]:
     return [
         {"name": s.name, "description": s.description, "input_schema": _strict_schema(s.input_model), "strict": True}

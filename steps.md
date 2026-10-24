@@ -111,7 +111,7 @@ React + TypeScript (Vite) frontend  ──HTTP/JSON──►  FastAPI backend (P
 - The **tool registry** validates and executes.
 - The **orchestrator** checks results and sets the final ticket outcome. The planner's text never decides it.
 
-**Engines.** `AGENT_ENGINE=auto|claude|gemini|rules`.
+**Engines.** `AGENT_ENGINE=auto|llm|rules`. Since 2026-10-24, `llm` is a failover chain over `LLM_PROVIDERS` (gemini, groq, cerebras, ollama, claude). It switches forward on quota or outage errors, and every switch is audited. The bullets below describe the earlier single-provider design.
 - `auto` resolves **once at startup**: `claude` if `ANTHROPIC_API_KEY` is set, else `gemini` if `GEMINI_API_KEY` is set, else `rules`. Gemini was added on 2026-10-24 at the user's request, because the team has a Gemini key.
 - The resolved engine is shown in the UI and recorded on every run.
 - If a Claude call fails during a run, that run ends as `failed` and is escalated. It **never** switches over to the rules engine silently.
@@ -264,7 +264,7 @@ No "human minutes saved" figure is reported, because no measured baseline exists
 ### Test results (actual)
 | Date | Command | Result |
 |---|---|---|
-| 2026-10-24 | `cd backend && .venv/bin/python -m pytest -q` | **85 passed** (policy, tools, scenarios, review regressions, Claude mocked, Gemini mocked, API) |
+| 2026-10-24 | `cd backend && .venv/bin/python -m pytest -q` | **91 passed** (policy, tools, scenarios, review regressions, Claude mocked, Gemini mocked, API) |
 | 2026-10-24 | Live Gemini (`gemini-3.6-flash`), TKT-1001 | **resolved, refund verified, 48 s** |
 | 2026-10-24 | Live Gemini (`gemini-3.5-flash-lite`), TKT-1002 / 1004 (+ follow-up) / 1006 | pending_approval / clarified then resolved / escalated as suspicious: **all as expected** |
 | 2026-10-24 | `cd frontend && npm run build` | tsc + vite build OK |
@@ -280,7 +280,15 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
 - 1 tool failure.
 - Scenario check 8/8.
 
+- [x] **Multi-provider failover (2026-10-24).**
+  - Groq, Cerebras and Ollama were added through one OpenAI-compatible client, with a provider-neutral history so a run can switch providers mid-ticket.
+  - 91 tests pass, 6 of them new failover tests: mid-run Gemini → Groq switch with history re-rendered, all providers down → escalate, refusal does not switch, unparseable arguments are rejected, chain order and configuration, Bearer key in a header.
+  - **Live:** a real Gemini 429 (exhausted `gemini-3.6-flash`) failed over to local Ollama `qwen2.5:3b-instruct` mid-run, and both models were recorded.
+  - The 3B model left out the required `injection_suspected` field on every `record_assessment` call. Validation rejected it each time, so the agent could not act and the ticket was escalated with no refund. That is safe, but too weak to be useful: Ollama needs a 7B+ model.
+
 ### Blocked / pending
+- [ ] Groq and Cerebras need API keys (`GROQ_API_KEY`, `CEREBRAS_API_KEY`) before they can be tested live. Their default model names (`openai/gpt-oss-120b`, `gpt-oss-120b`) should be checked against each provider's `/models` list once keys exist.
+- [ ] Ollama: pull a 7B+ tool-capable model (e.g. `qwen2.5:7b-instruct`, about 4.7 GB) for a useful offline fallback.
 - [x] **Live Gemini test (2026-10-24, free-tier key):**
   - The key is valid, with 46 models available.
   - `gemini-3.8-flash` was overloaded: 57 s for a trivial prompt, one 90 s timeout, and 3.7-flash returned 503 "high demand". The default is now `gemini-3.6-flash` (about 2 s per call).

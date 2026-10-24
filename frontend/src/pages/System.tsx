@@ -36,11 +36,9 @@ export function System({ onChange }: { onChange: () => void }) {
         <div className="card-h"><h2>Agent engine</h2></div>
         <div className="card-b">
           <dl className="kv">
-            <dt>Active engine</dt><dd>{s.engine === "rules" ? <Badge>Rules engine (no LLM)</Badge> : <Badge tone="accent">{s.engine === "claude" ? "Claude" : "Gemini"} · {s.model}</Badge>}</dd>
+            <dt>Active engine</dt><dd>{s.engine === "rules" ? <Badge>Rules engine (no LLM)</Badge> : <Badge tone="accent">LLM with failover</Badge>}</dd>
             <dt>Setting</dt><dd><code>AGENT_ENGINE={s.engine_setting}</code> (resolved once at startup)</dd>
-            <dt>Gemini key</dt><dd>{s.gemini_configured ? <Badge tone="ok">configured</Badge> : <Badge tone="bad">missing GEMINI_API_KEY</Badge>}</dd>
-            <dt>Claude key</dt><dd>{s.claude_configured ? <Badge tone="ok">configured</Badge> : <Badge>not set</Badge>}</dd>
-            <dt>Model</dt><dd><code>{s.model}</code></dd>
+            <dt>Failover chain</dt><dd>{s.llm_configured ? <code>{s.model}</code> : <Badge tone="bad">no provider configured</Badge>}</dd>
             <dt>Auto-refund limit</dt><dd>Rs {s.auto_refund_limit_rupees.toLocaleString("en-IN")}</dd>
             <dt>Turn budget</dt><dd>{s.max_agent_turns} planner turns · {s.tool_max_attempts} attempts per tool call</dd>
           </dl>
@@ -48,6 +46,25 @@ export function System({ onChange }: { onChange: () => void }) {
             A failed LLM call fails the run and escalates the ticket. The app never switches to the rules engine silently.
           </p>
         </div>
+      </section>
+
+      <section className="card">
+        <div className="card-h"><h2>LLM providers (failover order)</h2></div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th className="num">#</th><th>Provider</th><th>Model</th><th>Status</th></tr></thead>
+            <tbody>
+              {s.providers.map((p) => (
+                <tr key={p.name}>
+                  <td className="num">{p.order}</td><td>{p.name}</td><td className="mono">{p.model}</td>
+                  <td>{p.configured ? <Badge tone="ok">in chain</Badge> : <Badge>not configured</Badge>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="card-b small muted">Order comes from <code>LLM_PROVIDERS</code> in .env. On a quota, timeout or outage the run
+          moves to the next configured provider (never back, never to the rules engine). Refusals do not trigger a switch.</div>
       </section>
 
       <section className="card">

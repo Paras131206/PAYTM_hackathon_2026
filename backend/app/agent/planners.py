@@ -1,6 +1,7 @@
 """Planners propose the next tool calls. They never execute tools or decide policy themselves.
 
-- ClaudePlanner: Claude chooses tools in a manual tool-use loop (engine="claude").
+- LLMPlanner (engine="llm"): an LLM chooses tools; providers (Gemini, Groq, Cerebras, Ollama, Claude) are tried in
+  LLM_PROVIDERS order and the run fails over to the next one on quota/outage errors. Every switch is audited.
 - RulesPlanner: a deterministic, keyword-based planner with NO LLM (engine="rules"). It exists so the product can
   be run and tested offline. It is always labelled as the rules engine and is never used as a hidden fallback.
 """
@@ -13,15 +14,9 @@ from datetime import datetime, timedelta
 from typing import Any, Generator
 
 from .. import guards
-from ..tools.registry import ToolResult, anthropic_tool_definitions, gemini_tool_definitions
-from .llm import ClaudeClient, GeminiClient, LLMError
-
-
-@dataclass
-class ToolCall:
-    id: str
-    name: str
-    args: dict[str, Any]
+from ..tools.registry import ToolResult
+from .llm import LLMError
+from .providers import ToolCall, build_chain
 
 
 @dataclass
@@ -29,9 +24,11 @@ class PlannerTurn:
     tool_calls: list[ToolCall] = field(default_factory=list)
     done: bool = False
     note: str = ""
+    events: list[tuple[str, dict]] = field(default_factory=list)   # e.g. provider failovers, emitted to the audit trail
+    answered_by: str = ""
 
 
-# ----------------------------------------------------------------------------------------------------- Claude
+# ------------------------------------------------------------------------------------------------- LLM planner
 SYSTEM_PROMPT = """You are Resolv, an AI support teammate for a UPI payments app. You work the support queue \
 alongside human agents. Your scope is payment complaints: failed payments where money was debited, pending payments, \
 duplicate charges, and refund status. Anything else is escalated.
@@ -81,92 +78,55 @@ def case_prompt(context: dict[str, Any], suspicious_hint: bool) -> str:
     )
 
 
-def _block_get(block: Any, key: str) -> Any:
-    return block.get(key) if isinstance(block, dict) else getattr(block, key, None)
+# Errors that mean "this provider is unavailable right now", where trying the next provider is safe. A refusal or a
+# malformed answer is not on the list: switching models to get past a refusal would defeat the point of it.
+FAILOVER_CODES = {"rate_limited", "timeout", "connection_error", "api_error", "model_not_found", "auth_failed",
+                  "missing_credentials"}
 
 
-class ClaudePlanner:
-    engine = "claude"
+class LLMPlanner:
+    """Runs a provider chain in order and fails over (forward only) when a provider is unavailable."""
 
-    def __init__(self, client: ClaudeClient | None = None):
-        self.client = client or ClaudeClient()
-        self.model = self.client.model
-        self.messages: list[dict[str, Any]] = []
-        self._pending_ids: list[str] = []
+    engine = "llm"
+
+    def __init__(self, providers: list):
+        if not providers:
+            raise LLMError("missing_credentials", "No LLM provider is configured.")
+        self.providers = providers
+        self.i = 0
+        self.history: list = []
+        self.models_used: list[str] = []
+
+    @property
+    def model(self) -> str:
+        return " → ".join(self.models_used) or f"{self.providers[0].name}:{self.providers[0].model}"
 
     def start(self, context: dict[str, Any], suspicious_hint: bool) -> None:
-        self.messages = [{"role": "user", "content": case_prompt(context, suspicious_hint)}]
+        self.history = [("user", case_prompt(context, suspicious_hint))]
 
     def next(self, results: list[tuple[ToolCall, ToolResult]]) -> PlannerTurn:
         if results:
-            self.messages.append({
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": call.id,
-                        "content": json.dumps(res.to_dict(), default=str),
-                        **({"is_error": True} if res.status in {"error", "invalid_args"} else {}),
-                    }
-                    for call, res in results
-                ],
-            })
-        for _ in range(3):  # bounded: pause_turn continuations must not loop forever
-            response = self.client.create(system=SYSTEM_PROMPT, messages=self.messages,
-                                          tools=anthropic_tool_definitions())
-            content = list(_block_get(response, "content") or [])
-            self.messages.append({"role": "assistant", "content": content})
-            stop = _block_get(response, "stop_reason")
-            if stop != "pause_turn":
+            self.history.append(("results", results))
+        events: list[tuple[str, dict]] = []
+        while True:
+            p = self.providers[self.i]
+            try:
+                turn = p.complete(SYSTEM_PROMPT, self.history)
                 break
-        else:
-            raise LLMError("pause_loop", "Model kept pausing; giving up after 3 continuations.")
-        text = " ".join(_block_get(b, "text") or "" for b in content if _block_get(b, "type") == "text").strip()
-        calls = [
-            ToolCall(_block_get(b, "id"), _block_get(b, "name"), dict(_block_get(b, "input") or {}))
-            for b in content if _block_get(b, "type") == "tool_use"
-        ]
-        if stop == "tool_use" and calls:
-            return PlannerTurn(tool_calls=calls, note=text)
-        return PlannerTurn(done=True, note=text)
-
-
-# ----------------------------------------------------------------------------------------------------- Gemini
-class GeminiPlanner:
-    """Same contract as ClaudePlanner, over Gemini function calling. Uses the same system prompt and tools."""
-
-    engine = "gemini"
-
-    def __init__(self, client: GeminiClient | None = None):
-        self.client = client or GeminiClient()
-        self.model = self.client.model
-        self.contents: list[dict[str, Any]] = []
-        self._n = 0
-
-    def start(self, context: dict[str, Any], suspicious_hint: bool) -> None:
-        self.contents = [{"role": "user", "parts": [{"text": case_prompt(context, suspicious_hint)}]}]
-
-    def next(self, results: list[tuple[ToolCall, ToolResult]]) -> PlannerTurn:
-        if results:
-            self.contents.append({"role": "user", "parts": [
-                {"functionResponse": {**({"id": call.id} if not call.id.startswith("gemini-") else {}),
-                                      "name": call.name, "response": res.to_dict()}}
-                for call, res in results
-            ]})
-        candidate = self.client.create(system=SYSTEM_PROMPT, contents=self.contents, tools=gemini_tool_definitions())
-        content = candidate.get("content") or {"role": "model", "parts": []}
-        self.contents.append(content)  # verbatim, so thought signatures go back unchanged
-        parts = content.get("parts") or []
-        calls = []
-        for p in parts:
-            fc = p.get("functionCall")
-            if fc:
-                self._n += 1
-                calls.append(ToolCall(fc.get("id") or f"gemini-{self._n}", fc["name"], dict(fc.get("args") or {})))
-        text = " ".join(p["text"] for p in parts if p.get("text") and not p.get("thought")).strip()
-        if calls:
-            return PlannerTurn(tool_calls=calls, note=text)
-        return PlannerTurn(done=True, note=text)
+            except LLMError as e:
+                if e.code not in FAILOVER_CODES or self.i + 1 >= len(self.providers):
+                    e.events = events  # type: ignore[attr-defined]  # earlier failovers still belong in the audit trail
+                    raise
+                nxt = self.providers[self.i + 1]
+                events.append(("llm_failover", {"from": f"{p.name}:{p.model}", "to": f"{nxt.name}:{nxt.model}",
+                                                "code": e.code, "message": str(e)[:300]}))
+                self.i += 1
+        label = f"{turn.provider}:{turn.model}"
+        if label not in self.models_used:
+            self.models_used.append(label)
+        self.history.append(("assistant", turn))
+        return PlannerTurn(tool_calls=turn.calls, done=not turn.calls, note=turn.text, events=events,
+                           answered_by=label)
 
 
 # ------------------------------------------------------------------------------------------------------ Rules
@@ -418,11 +378,9 @@ def _duplicate_candidates(txns: list[dict]) -> set[str]:
     return out
 
 
-def make_planner(engine: str, claude_client: ClaudeClient | None = None):
-    if engine == "claude":
-        return ClaudePlanner(claude_client)
-    if engine == "gemini":
-        return GeminiPlanner()
+def make_planner(engine: str):
+    if engine == "llm":
+        return LLMPlanner(build_chain())
     if engine == "rules":
         return RulesPlanner()
     raise ValueError(f"unknown engine {engine!r}")

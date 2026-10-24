@@ -30,14 +30,16 @@ def gemini_api_key() -> str:
     return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
 
 
-def engine_configured(engine: str) -> bool:
-    return {"claude": claude_credentials_present(), "gemini": bool(gemini_api_key()), "rules": True}.get(engine, False)
+def _llm_keys_present() -> bool:
+    return any(os.getenv(k) for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY", "GOOGLE_API_KEY",
+                                      "GROQ_API_KEY", "CEREBRAS_API_KEY", "OLLAMA_MODEL"))
 
 
 @dataclass
 class Settings:
     db_path: Path = field(default_factory=lambda: Path(os.getenv("RESOLV_DB_PATH", BACKEND_DIR / "data" / "resolv.db")))
-    # auto | claude | gemini | rules. "auto" is resolved ONCE at startup (see resolved_engine) and never changes mid-run.
+    # auto | llm | rules. "auto" is resolved ONCE at startup: llm if any provider is configured, else rules.
+    # "llm" runs the LLM_PROVIDERS chain in order, failing over to the next provider on quota/outage errors.
     agent_engine: str = field(default_factory=lambda: os.getenv("AGENT_ENGINE", "auto").strip().lower())
     anthropic_model: str = field(default_factory=lambda: os.getenv("ANTHROPIC_MODEL", "claude-opus-5-5"))
     anthropic_effort: str = field(default_factory=lambda: os.getenv("ANTHROPIC_EFFORT", "medium"))
@@ -45,6 +47,16 @@ class Settings:
     anthropic_refusal_fallback: bool = field(default_factory=lambda: _bool("ANTHROPIC_REFUSAL_FALLBACK", True))
     gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.6-flash"))
     gemini_timeout_s: float = field(default_factory=lambda: float(os.getenv("GEMINI_TIMEOUT_S", "90")))
+    llm_providers: list[str] = field(default_factory=lambda: [
+        p.strip().lower() for p in os.getenv("LLM_PROVIDERS", "gemini,groq,cerebras,ollama,claude").split(",")
+        if p.strip()])
+    groq_api_key: str = field(default_factory=lambda: os.getenv("GROQ_API_KEY", ""))
+    groq_model: str = field(default_factory=lambda: os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
+    cerebras_api_key: str = field(default_factory=lambda: os.getenv("CEREBRAS_API_KEY", ""))
+    cerebras_model: str = field(default_factory=lambda: os.getenv("CEREBRAS_MODEL", "gpt-oss-120b"))
+    ollama_model: str = field(default_factory=lambda: os.getenv("OLLAMA_MODEL", ""))  # empty = Ollama not used
+    ollama_base_url: str = field(default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"))
+    ollama_timeout_s: float = field(default_factory=lambda: float(os.getenv("OLLAMA_TIMEOUT_S", "180")))
     auto_refund_limit_paise: int = field(default_factory=lambda: int(os.getenv("AUTO_REFUND_LIMIT_PAISE", "200000")))
     max_agent_turns: int = field(default_factory=lambda: int(os.getenv("MAX_AGENT_TURNS", "12")))
     tool_max_attempts: int = field(default_factory=lambda: int(os.getenv("TOOL_MAX_ATTEMPTS", "3")))
@@ -56,10 +68,13 @@ class Settings:
     resolved_engine: str = ""
 
     def __post_init__(self) -> None:
-        if self.agent_engine not in {"auto", "claude", "gemini", "rules"}:
-            raise ValueError(f"AGENT_ENGINE must be auto|claude|gemini|rules, got {self.agent_engine!r}")
+        if self.agent_engine not in {"auto", "llm", "rules"}:
+            raise ValueError(f"AGENT_ENGINE must be auto|llm|rules, got {self.agent_engine!r}")
+        unknown = set(self.llm_providers) - {"claude", "gemini", "groq", "cerebras", "ollama"}
+        if unknown:
+            raise ValueError(f"LLM_PROVIDERS has unknown providers: {sorted(unknown)}")
         if self.agent_engine == "auto":
-            self.resolved_engine = next(e for e in ("claude", "gemini", "rules") if engine_configured(e))
+            self.resolved_engine = "llm" if _llm_keys_present() else "rules"
         else:
             self.resolved_engine = self.agent_engine
 
@@ -79,6 +94,3 @@ def iso(dt: datetime) -> str:
 def parse_iso(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
-
-def model_for(engine: str) -> str | None:
-    return {"claude": settings.anthropic_model, "gemini": settings.gemini_model}.get(engine)
