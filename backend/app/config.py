@@ -43,7 +43,7 @@ class Settings:
     anthropic_effort: str = field(default_factory=lambda: os.getenv("ANTHROPIC_EFFORT", "medium"))
     anthropic_timeout_s: float = field(default_factory=lambda: float(os.getenv("ANTHROPIC_TIMEOUT_S", "90")))
     anthropic_refusal_fallback: bool = field(default_factory=lambda: _bool("ANTHROPIC_REFUSAL_FALLBACK", True))
-    gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.8-flash"))
+    gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.6-flash"))
     gemini_timeout_s: float = field(default_factory=lambda: float(os.getenv("GEMINI_TIMEOUT_S", "90")))
     auto_refund_limit_paise: int = field(default_factory=lambda: int(os.getenv("AUTO_REFUND_LIMIT_PAISE", "200000")))
     max_agent_turns: int = field(default_factory=lambda: int(os.getenv("MAX_AGENT_TURNS", "12")))

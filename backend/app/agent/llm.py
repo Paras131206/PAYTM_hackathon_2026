@@ -97,15 +97,16 @@ class GeminiClient:
             "toolConfig": {"functionCallingConfig": {"mode": "AUTO"}},
         }
         url = GEMINI_URL.format(model=self.model)
-        for attempt in range(3):  # retry 429/5xx like the vendor SDKs do
+        attempts = 4
+        for attempt in range(attempts):  # retry 429/5xx; free-tier 429s say how long to wait
             try:
                 r = self._http.post(url, json=body, headers={"x-goog-api-key": self._key})
             except httpx.TimeoutException as e:
                 raise LLMError("timeout", "The Gemini request timed out.") from e
             except httpx.HTTPError as e:
                 raise LLMError("connection_error", f"Could not reach the Gemini API: {e}") from e
-            if (r.status_code == 429 or r.status_code >= 500) and attempt < 2:
-                time.sleep(1.5 * (attempt + 1))
+            if (r.status_code == 429 or r.status_code >= 500) and attempt < attempts - 1:
+                time.sleep(_retry_delay(r) or 2.0 * 2 ** attempt)
                 continue
             break
         if r.status_code != 200:
@@ -128,6 +129,17 @@ class GeminiClient:
         if finish != "STOP":
             raise LLMError("unexpected_stop", f"Gemini stopped with {finish}; treating the run as failed.")
         return candidates[0]
+
+
+def _retry_delay(r: httpx.Response) -> float | None:
+    """Seconds from a google.rpc.RetryInfo detail (e.g. "retryDelay": "23s"), capped so a run cannot stall."""
+    try:
+        for d in r.json()["error"].get("details", []):
+            if str(d.get("@type", "")).endswith("RetryInfo"):
+                return min(float(str(d["retryDelay"]).rstrip("s")) + 0.5, 30.0)
+    except Exception:
+        pass
+    return None
 
 
 def _gemini_error_message(r: httpx.Response) -> str:

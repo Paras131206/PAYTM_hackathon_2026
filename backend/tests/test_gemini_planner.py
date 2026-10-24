@@ -92,7 +92,7 @@ def test_happy_path_resolves_with_verified_refund(monkeypatch):
 ])
 def test_http_errors_fail_run_without_fallback(monkeypatch, status, body, code):
     monkeypatch.setattr("app.agent.llm.time.sleep", lambda _s: None)
-    rid, out, _ = run_with([(status, body)] * 3)
+    rid, out, _ = run_with([(status, body)] * 4)
     assert out == "escalated" and events(rid, "error")[0]["code"] == code
     assert db.query_one("SELECT status FROM runs WHERE id = ?", (rid,))["status"] == "failed"
     assert db.query("SELECT * FROM refunds") == [] and not db.query("SELECT * FROM messages WHERE role='agent'")
@@ -128,3 +128,25 @@ def test_missing_key(monkeypatch):
     with pytest.raises(LLMError) as e:
         GeminiClient()
     assert e.value.code == "missing_credentials"
+
+
+def test_rate_limit_honours_retry_delay(monkeypatch):
+    slept = []
+    monkeypatch.setattr("app.agent.llm.time.sleep", slept.append)
+    limited = {"error": {"code": 429, "message": "quota", "details": [
+        {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "12s"}]}}
+    rid, _, seen = run_with([(429, limited), (200, candidate([{"text": "nothing to do"}]))])
+    assert slept == [12.5] and len(seen) == 2
+
+
+def test_llm_failure_after_approval_queued_keeps_pending_approval(monkeypatch):
+    monkeypatch.setattr("app.agent.llm.time.sleep", lambda _s: None)
+    responses = [
+        (200, candidate([fc("record_assessment", {**ASSESS, "target_txn_id": "UPI4021000201"})])),
+        (200, candidate([fc("check_switch_status", {"txn_id": "UPI4021000201"})])),
+        (200, candidate([fc("issue_refund", {"txn_id": "UPI4021000201", "reason": "failed_debit"})])),
+    ] + [(429, {"error": {"message": "quota"}})] * 4
+    rid, out, _ = run_with(responses, ticket="TKT-1002")
+    assert out == "pending_approval"
+    assert db.query_one("SELECT status, outcome FROM runs WHERE id = ?", (rid,)) == {"status": "failed",
+                                                                                   "outcome": "pending_approval"}

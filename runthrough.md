@@ -44,7 +44,7 @@ cp .env.example .env
 
 Open `.env` (`open -e .env` on macOS) and set **one** key:
 
-- **Gemini:** `GEMINI_API_KEY=...`. Get a key at https://aistudio.google.com/apikey; the free tier has rate limits. The model comes from `GEMINI_MODEL` (default `gemini-3.8-flash`).
+- **Gemini:** `GEMINI_API_KEY=...`. Get a key at https://aistudio.google.com/apikey; the free tier has rate limits. The model comes from `GEMINI_MODEL` (default `gemini-3.6-flash`; the newest `gemini-3.8-flash` was overloaded when tested).
 - **Claude:** `ANTHROPIC_API_KEY=...`, from console.anthropic.com; this is paid.
 
 With `AGENT_ENGINE=auto` (the default), the backend picks Claude if its key is set, else Gemini, else the rules engine. It decides **once, at startup**. To force one engine, set `AGENT_ENGINE=gemini`. **Restart the backend after you edit `.env`.** The top bar then shows `Gemini · <model>`.
@@ -128,7 +128,7 @@ cd PAYTM_hackathon_2026/backend
 .venv/bin/python -m pytest -q
 ```
 
-Expected: `82 passed`. The tests use a temporary database and **mocked** Claude and Gemini clients, so they make no network calls.
+Expected: `84 passed`. The tests use a temporary database and **mocked** Claude and Gemini clients, so they make no network calls.
 
 ```bash
 cd PAYTM_hackathon_2026/frontend

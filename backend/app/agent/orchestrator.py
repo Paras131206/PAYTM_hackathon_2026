@@ -111,13 +111,17 @@ def execute_run(run_id: int, planner_factory: Callable[[str], Any] | None = None
 
 def _fail(ctx: RunContext, turns: int, source: str, code: str, message: str, reason: str) -> str:
     """Record the error and escalate; the run is always closed even if escalation itself fails."""
+    outcome = "escalated"
     try:
         ctx.emit("error", {"source": source, "code": code, "message": message,
-                           "note": "No fallback output was generated. The ticket was escalated."})
+                           "note": "No fallback output was generated. The ticket was handed to a human."})
         _system_escalate(ctx, reason, f"Agent run failed ({source}: {code}): {message}"[:800])
+        # A ticket already with a human (e.g. pending approval) keeps that state; report it as it is.
+        status = ctxsvc.get_ticket(ctx.ticket_id)["status"]
+        outcome = OUTCOME_BY_STATUS.get(status, outcome)
     finally:
-        _finish(ctx.run_id, "failed", "escalated", turns, f"{code}: {message}")
-    return "escalated"
+        _finish(ctx.run_id, "failed", outcome, turns, f"{code}: {message}")
+    return outcome
 
 
 def fail_stale_runs() -> int:
