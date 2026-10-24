@@ -7,7 +7,7 @@ This guide takes you from a clean checkout to a running demo. Commands assume ma
 | Part | Status |
 |---|---|
 | Agent loop, policy engine, tool registry, verification, audit trail, approvals, metrics | **Real and working** (local) |
-| LLM planner (`engine=llm`) with failover | **Real.** Providers are tried in `LLM_PROVIDERS` order (default gemini → groq → ollama). Only configured ones join the chain. **Tested live:** Gemini, and a real Gemini 429 failing over to local Ollama mid-run. Groq is implemented and mock-tested; live test pending its key. |
+| LLM planner (`engine=llm`) with failover | **Real.** Providers are tried in `LLM_PROVIDERS` order (default gemini → groq → ollama). Only configured ones join the chain. **Tested live:** Gemini, and a real Gemini 429 failing over to local Ollama mid-run. Groq tested live too, including a real Gemini 429 failing over to Groq mid-ticket. |
 | Rules planner (`engine=rules`) | **Real**, deterministic, no LLM. Always labelled in the UI. |
 | Payment switch status | **Sandbox**: reads ground truth from SQLite. Supports injected outages and timeouts. |
 | Refund rail | **Sandbox**: writes a refund row and marks the transaction reversed. **No money moves.** |

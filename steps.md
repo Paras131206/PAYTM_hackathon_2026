@@ -267,6 +267,8 @@ No "human minutes saved" figure is reported, because no measured baseline exists
 | 2026-10-24 | `cd backend && .venv/bin/python -m pytest -q` | **91 passed** (policy, tools, scenarios, review regressions, Claude mocked, Gemini mocked, API) |
 | 2026-10-24 | Live Gemini (`gemini-3.6-flash`), TKT-1001 | **resolved, refund verified, 48 s** |
 | 2026-10-24 | Live Gemini (`gemini-3.5-flash-lite`), TKT-1002 / 1004 (+ follow-up) / 1006 | pending_approval / clarified then resolved / escalated as suspicious: **all as expected** |
+| 2026-10-24 | Live Groq (`gpt-oss-120b`), TKT-1001 / 1002 / 1006, plus Gemini→Groq failover on TKT-1007 | resolved / pending_approval / escalated / **failover then resolved**: all as expected |
+| 2026-10-24 | `pytest` after removing Claude and Cerebras | **80 passed** |
 | 2026-10-24 | `cd frontend && npm run build` | tsc + vite build OK |
 | 2026-10-24 | Documented reset commands (`python -m app.seed`, `POST /api/demo/reset`) | OK |
 
@@ -289,7 +291,16 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
 - [x] **Paid providers removed (2026-10-24, at the team's request):** Anthropic/Claude and Cerebras. Their code, tests, settings and the `anthropic` dependency are gone. The supported chain is now Gemini → Groq → Ollama (all free or local). 80 tests pass with the `anthropic` package uninstalled. Earlier entries in this file that mention Claude or Cerebras describe work that has since been removed.
 
 ### Blocked / pending
-- [ ] Groq needs `GROQ_API_KEY` before it can be tested live. Check the default model (`openai/gpt-oss-120b`) against Groq's `/models` list once the key exists.
+- [x] **Groq live (2026-10-24, free tier, `openai/gpt-oss-120b`, confirmed on the key's `/models` list):**
+  - Groq only:
+    - TKT-1001: resolved with the refund verified (81 s).
+    - TKT-1002: approval queued; the agent's `update_ticket` was blocked (`handed_to_human`) (70 s).
+    - TKT-1006: injection escalated with no refund (44 s).
+  - **Failover:** TKT-1007 started on Gemini `gemini-3.6-flash` (daily quota exhausted). A real 429 moved it to Groq mid-run, and it resolved with only the duplicate payment `UPI4021000702` refunded and verified (83 s).
+  - Observations:
+    - Groq runs took 44–83 s, probably because free-tier token-per-minute limits trigger `retry-after` waits.
+    - In TKT-1007 Groq said the refund would arrive "within 2–3 business days". No tool supplied that timeline. The refund itself was verified, so this is a wording issue, not a safety one. A future fix is to add the expected timeline to the `issue_refund` result, so the model has a real figure to quote.
+- [x] `.env` repair: the Gemini key line contained the key pasted 4 times. It was restored to the single 53-character key, after Google confirmed it (HTTP 200).
 - [ ] Ollama: pull a 7B+ tool-capable model (e.g. `qwen2.5:7b-instruct`, about 4.7 GB) for a useful offline fallback.
 - [x] **Live Gemini test (2026-10-24, free-tier key):**
   - The key is valid, with 46 models available.
