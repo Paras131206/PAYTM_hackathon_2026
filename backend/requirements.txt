@@ -1,0 +1,10 @@
+# Resolv backend — tested with Python 3.14.8 on macOS (arm64). Versions below are the ones installed and tested.
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.1
+anthropic==2.3.0
+python-dotenv==1.2.4
+httpx==0.28.1        # Gemini REST adapter (app/agent/llm.py); also used by fastapi.testclient
+
+# Test-only
+pytest==9.1.1

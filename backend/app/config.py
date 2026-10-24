@@ -1,0 +1,84 @@
+"""Runtime configuration. Every value comes from the environment (or a .env file); nothing secret is hardcoded."""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+REPO_DIR = BACKEND_DIR.parent
+
+# A repo-root .env is loaded if present. Real environment variables take precedence.
+load_dotenv(REPO_DIR / ".env", override=False)
+
+
+def _bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def claude_credentials_present() -> bool:
+    return bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN"))
+
+
+def gemini_api_key() -> str:
+    return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
+
+
+def engine_configured(engine: str) -> bool:
+    return {"claude": claude_credentials_present(), "gemini": bool(gemini_api_key()), "rules": True}.get(engine, False)
+
+
+@dataclass
+class Settings:
+    db_path: Path = field(default_factory=lambda: Path(os.getenv("RESOLV_DB_PATH", BACKEND_DIR / "data" / "resolv.db")))
+    # auto | claude | gemini | rules. "auto" is resolved ONCE at startup (see resolved_engine) and never changes mid-run.
+    agent_engine: str = field(default_factory=lambda: os.getenv("AGENT_ENGINE", "auto").strip().lower())
+    anthropic_model: str = field(default_factory=lambda: os.getenv("ANTHROPIC_MODEL", "claude-opus-5-5"))
+    anthropic_effort: str = field(default_factory=lambda: os.getenv("ANTHROPIC_EFFORT", "medium"))
+    anthropic_timeout_s: float = field(default_factory=lambda: float(os.getenv("ANTHROPIC_TIMEOUT_S", "90")))
+    anthropic_refusal_fallback: bool = field(default_factory=lambda: _bool("ANTHROPIC_REFUSAL_FALLBACK", True))
+    gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.8-flash"))
+    gemini_timeout_s: float = field(default_factory=lambda: float(os.getenv("GEMINI_TIMEOUT_S", "90")))
+    auto_refund_limit_paise: int = field(default_factory=lambda: int(os.getenv("AUTO_REFUND_LIMIT_PAISE", "200000")))
+    max_agent_turns: int = field(default_factory=lambda: int(os.getenv("MAX_AGENT_TURNS", "12")))
+    tool_max_attempts: int = field(default_factory=lambda: int(os.getenv("TOOL_MAX_ATTEMPTS", "3")))
+    tool_retry_backoff_s: float = field(default_factory=lambda: float(os.getenv("TOOL_RETRY_BACKOFF_S", "0.4")))
+    cors_origins: list[str] = field(
+        default_factory=lambda: os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    )
+
+    resolved_engine: str = ""
+
+    def __post_init__(self) -> None:
+        if self.agent_engine not in {"auto", "claude", "gemini", "rules"}:
+            raise ValueError(f"AGENT_ENGINE must be auto|claude|gemini|rules, got {self.agent_engine!r}")
+        if self.agent_engine == "auto":
+            self.resolved_engine = next(e for e in ("claude", "gemini", "rules") if engine_configured(e))
+        else:
+            self.resolved_engine = self.agent_engine
+
+
+settings = Settings()
+
+
+def utcnow() -> datetime:
+    """Single clock for the app so tests can patch it."""
+    return datetime.now(timezone.utc)
+
+
+def iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def parse_iso(value: str) -> datetime:
+    return datetime.fromisoformat(value)
+
+
+def model_for(engine: str) -> str | None:
+    return {"claude": settings.anthropic_model, "gemini": settings.gemini_model}.get(engine)

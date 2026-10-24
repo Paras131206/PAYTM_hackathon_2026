@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "/Users/paras/Desktop/PAYTM_hackathon_2026/backend/.venv/bin/uvicorn",
+      "runtimeArgs": ["app.api:app", "--app-dir", "/Users/paras/Desktop/PAYTM_hackathon_2026/backend", "--host", "127.0.0.1", "--port", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/paras/Desktop/PAYTM_hackathon_2026/frontend", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}

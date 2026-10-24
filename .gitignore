@@ -1,0 +1,29 @@
+# Unrelated folders that were already in this directory before the project was created.
+# They are separate repositories (plugins / Windows tools) and are NOT part of this project.
+/TBOK-Win11Optimizer/
+/WinMemoryCleaner/
+/caveman/
+/compound-engineering-plugin/
+/last30days-skill/
+/ponytail/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets
+.env
+*.env.local
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/data/*.db
+backend/data/*.db-*
+
+# Node
+node_modules/
+frontend/dist/
