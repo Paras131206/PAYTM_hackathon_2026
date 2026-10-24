@@ -9,7 +9,7 @@ from typing import Any, Callable
 from .. import context as ctxsvc
 from .. import db, guards
 from ..config import iso, parse_iso, settings, utcnow
-from ..tools.registry import RunContext, execute
+from ..tools.registry import RunContext, create_handoff, execute
 from .llm import LLMError
 from .planners import make_planner
 from .providers import chain_label
@@ -129,6 +129,7 @@ def _fail(ctx: RunContext, turns: int, source: str, code: str, message: str, rea
         ctx.emit("error", {"source": source, "code": code, "message": message,
                            "note": "No fallback output was generated. The ticket was handed to a human."})
         _system_escalate(ctx, reason, f"Agent run failed ({source}: {code}): {message}"[:800])
+        _flag_if_customer_not_told(ctx)
         # A ticket already with a human (e.g. pending approval) keeps that state; report it as it is.
         status = ctxsvc.get_ticket(ctx.ticket_id)["status"]
         outcome = OUTCOME_BY_STATUS.get(status, outcome)
@@ -157,7 +158,23 @@ def _system_escalate(ctx: RunContext, reason: str, summary: str) -> None:
         ctx.actor = prev_actor
 
 
+def _flag_if_customer_not_told(ctx: RunContext) -> None:
+    """A ticket this run resolved without replying leaves the customer uninformed: reopen it for a human."""
+    ticket = ctxsvc.get_ticket(ctx.ticket_id)
+    if ticket["status"] != "resolved" or ticket["resolved_by"] != ctx.actor:
+        return
+    replied = db.query_one("SELECT 1 FROM messages WHERE run_id = ? AND role IN ('agent', 'human')", (ctx.run_id,))
+    if replied:
+        return
+    ctx.emit("guard", {"check": "customer_not_notified", "flagged": True,
+                       "detail": "The ticket was resolved but the customer never got a reply. Reopened for a human."})
+    create_handoff(ctx, kind="escalation", reason_code="customer_not_notified",
+                   summary="Refund completed and verified, but the customer was not told. Send them the outcome.",
+                   evidence={"verified_refunds": sorted(ctx.verified_refunds)}, ticket_status="escalated")
+
+
 def _derive_outcome(ctx: RunContext) -> str:
+    _flag_if_customer_not_told(ctx)
     ticket = ctxsvc.get_ticket(ctx.ticket_id)
     status = ticket["status"]
     if status in {"open", "in_progress"}:

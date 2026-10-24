@@ -132,7 +132,7 @@ cd PAYTM_hackathon_2026/backend
 .venv/bin/python -m pytest -q
 ```
 
-Expected: `81 passed`. The tests use a temporary database and **mocked** provider clients (Gemini, OpenAI-compatible), so they make no network calls.
+Expected: `84 passed`. The tests use a temporary database and **mocked** provider clients (Gemini, OpenAI-compatible), so they make no network calls.
 
 ```bash
 cd PAYTM_hackathon_2026/frontend

@@ -182,7 +182,7 @@ Every tool has a pydantic input model and output model, argument validation, a p
 ## 9. Human approval and escalation policy
 
 - **Approval required:** any refund over ₹`AUTO_REFUND_LIMIT` (default ₹2,000), and any refund for a customer with ≥ 3 refunds in 30 days.
-- **Escalate:** ambiguous intent after one clarifying question; the transaction is not found; a merchant dispute on a successful payment; still pending after T+1; the tool fails after 3 tries; the customer asks for a human; injection or manipulation is suspected; the planner exceeds its step budget; any LLM error.
+- **Escalate:** a ticket resolved without the customer being told (`customer_not_notified`); ambiguous intent after one clarifying question; the transaction is not found; a merchant dispute on a successful payment; still pending after T+1; the tool fails after 3 tries; the customer asks for a human; injection or manipulation is suspected; the planner exceeds its step budget; any LLM error.
 - **The approval queue shows** the issue, the customer context, the proposed action and its arguments, the evidence (switch status, ledger), the policy checks, why approval is needed, and Approve / Reject / Request-info buttons. Approving runs the **same** `issue_refund` and `verify_refund` tools, attributed to `human:<reviewer>`.
 
 ## 10. Security and privacy
@@ -270,6 +270,7 @@ No "human minutes saved" figure is reported, because no measured baseline exists
 | 2026-10-24 | Live Groq (`gpt-oss-120b`), TKT-1001 / 1002 / 1006, plus Gemini→Groq failover on TKT-1007 | resolved / pending_approval / escalated / **failover then resolved**: all as expected |
 | 2026-10-24 | `pytest` after removing Claude and Cerebras | **80 passed** |
 | 2026-10-24 | `pytest` after the refund-ETA and Groq-retry fixes | **81 passed** |
+| 2026-10-24 | `pytest` after the customer-not-notified fix | **84 passed** |
 | 2026-10-24 | `cd frontend && npm run build` | tsc + vite build OK |
 | 2026-10-24 | Documented reset commands (`python -m app.seed`, `POST /api/demo/reset`) | OK |
 
@@ -303,7 +304,7 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
     - In TKT-1007 Groq said the refund would arrive "within 2–3 business days". No tool supplied that timeline. The refund itself was verified, so this is a wording issue, not a safety one. **Fixed:** `issue_refund` now returns `expected_credit: "within 1-2 working days"`, taken from a single constant, `policy.REFUND_CREDIT_ETA`, which also feeds the policy text and the rules and human-approval replies. The system prompt tells the model to quote it word for word and give no other timeline. Live recheck on Groq: TKT-1001's reply quoted "within 1-2 working days" exactly.
     - Remaining limit: this relies on the prompt, so a model could still paraphrase. No code guard checks timelines in replies.
   - **Groq `gpt-oss` glitch, found live:** the model sometimes calls a non-existent tool (`commentary`), and Groq rejects that with a 400 "Tool call validation failed". In one run this happened on the final reply turn, so the refund was verified and the ticket resolved, but **the customer was never told**. These 400s are now retried with a fresh sample (up to 3 attempts, with a test). The recheck run resolved cleanly.
-    - Open gap: a run that fails *after* resolving a ticket does not escalate, because `_system_escalate` skips resolved tickets, so a missing customer reply would go unnoticed. A follow-up should flag resolved tickets that have no agent reply.
+    - **Fixed (same day):** if a run resolves a ticket but posts no reply to the customer (because the LLM failed afterwards, or simply stopped), the orchestrator reopens the ticket as `escalated` with reason `customer_not_notified`. It logs a guard event and puts the ticket in the Human queue with the explanation; the verified refund stays. The human writes the outcome in the note and marks it handled, which sends the reply and closes the ticket. Tested for both endings, plus a negative test (a resolved ticket with a reply is not flagged).
 - [x] `.env` repair: the Gemini key line contained the key pasted 4 times. It was restored to the single 53-character key, after Google confirmed it (HTTP 200).
 - [ ] Ollama: pull a 7B+ tool-capable model (e.g. `qwen2.5:7b-instruct`, about 4.7 GB) for a useful offline fallback.
 - [x] **Live Gemini test (2026-10-24, free-tier key):**

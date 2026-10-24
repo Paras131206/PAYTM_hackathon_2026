@@ -181,3 +181,40 @@ def test_unverified_refund_claim_from_model_is_blocked():
     blocked = [r["data"].get("code") for r in events(rid, "tool_result") if r["status"] == "blocked"]
     assert blocked == ["unverified_claim"] and out == "escalated"
     assert not db.query("SELECT * FROM messages WHERE role = 'agent'")
+
+
+def _resolve_steps():
+    def verify_step(_req):
+        return 200, candidate([fc("verify_refund", {"refund_id": db.query_one("SELECT id FROM refunds")["id"]})])
+    return [
+        (200, candidate([fc("record_assessment", ASSESS)])),
+        (200, candidate([fc("check_switch_status", {"txn_id": "UPI4021000101"})])),
+        (200, candidate([fc("issue_refund", {"txn_id": "UPI4021000101", "reason": "failed_debit"})])),
+        verify_step,
+        (200, candidate([fc("update_ticket", {"ticket_id": "TKT-1001", "status": "resolved", "note": "ok"})])),
+    ]
+
+
+@pytest.mark.parametrize("ending", ["llm_error", "stops_silently"])
+def test_resolved_without_reply_is_reopened_for_a_human(ending):
+    from app import handoffs
+    last = (400, {"error": {"message": "bad"}}) if ending == "llm_error" else (200, candidate([{"text": "done"}]))
+    rid, out, _ = run_with(_resolve_steps() + [last])
+    assert out == "escalated"
+    assert any(g["check"] == "customer_not_notified" for g in events(rid, "guard"))
+    h = db.query_one("SELECT * FROM handoffs WHERE ticket_id = 'TKT-1001'")
+    assert h["kind"] == "escalation" and h["reason_code"] == "customer_not_notified" and h["status"] == "pending"
+    assert len(db.query("SELECT * FROM refunds")) == 1                    # the verified refund stays
+    # The human sends the outcome and closes it.
+    handoffs.decide(h["id"], "mark_handled", "Asha", "Your Rs 450 refund is done and will arrive in 1-2 working days.")
+    assert db.query_one("SELECT status FROM tickets WHERE id = 'TKT-1001'")["status"] == "closed"
+    assert db.query("SELECT * FROM messages WHERE ticket_id = 'TKT-1001' AND role = 'human'")
+
+
+def test_resolved_with_reply_is_not_flagged():
+    steps = _resolve_steps()
+    steps[-1] = (200, candidate([
+        fc("update_ticket", {"ticket_id": "TKT-1001", "status": "resolved", "note": "ok"}),
+        fc("reply_to_customer", {"ticket_id": "TKT-1001", "message": "Refund done."})]))
+    rid, out, _ = run_with(steps + [(200, candidate([{"text": "done"}]))])
+    assert out == "resolved" and not db.query("SELECT * FROM handoffs")

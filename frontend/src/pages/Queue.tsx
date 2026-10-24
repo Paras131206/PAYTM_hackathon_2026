@@ -43,6 +43,7 @@ const WHY: Record<string, string> = {
   tool_failure: "A required system kept failing after retries, so the agent stopped instead of guessing.",
   insufficient_evidence: "The agent could not confirm the facts it needed.",
   other: "Outside the agent's scope or it could not finish.",
+  customer_not_notified: "The refund is done and verified, but the agent stopped before telling the customer. Send them the outcome (use the note box) and mark handled.",
 };
 
 function HandoffCard({ h, onDone }: { h: Handoff; onDone: () => void }) {
