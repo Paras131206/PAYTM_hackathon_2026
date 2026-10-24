@@ -12,6 +12,7 @@ from typing import Any, Literal
 TAT_WINDOW = timedelta(hours=24)            # T+1 for UPI failed transactions (RBI TAT circular, 2019), simplified
 DUPLICATE_WINDOW = timedelta(minutes=10)
 REPEAT_REFUND_THRESHOLD = 3                 # refunds in the last 30 days that force human approval
+REFUND_CREDIT_ETA = "1-2 working days"      # when a refund reaches the source account; the only timeline we promise
 
 Decision = Literal["auto_refund", "needs_approval", "wait", "escalate", "block", "already_done"]
 

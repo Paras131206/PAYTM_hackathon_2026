@@ -269,6 +269,7 @@ No "human minutes saved" figure is reported, because no measured baseline exists
 | 2026-10-24 | Live Gemini (`gemini-3.5-flash-lite`), TKT-1002 / 1004 (+ follow-up) / 1006 | pending_approval / clarified then resolved / escalated as suspicious: **all as expected** |
 | 2026-10-24 | Live Groq (`gpt-oss-120b`), TKT-1001 / 1002 / 1006, plus Gemini→Groq failover on TKT-1007 | resolved / pending_approval / escalated / **failover then resolved**: all as expected |
 | 2026-10-24 | `pytest` after removing Claude and Cerebras | **80 passed** |
+| 2026-10-24 | `pytest` after the refund-ETA and Groq-retry fixes | **81 passed** |
 | 2026-10-24 | `cd frontend && npm run build` | tsc + vite build OK |
 | 2026-10-24 | Documented reset commands (`python -m app.seed`, `POST /api/demo/reset`) | OK |
 
@@ -299,7 +300,10 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
   - **Failover:** TKT-1007 started on Gemini `gemini-3.6-flash` (daily quota exhausted). A real 429 moved it to Groq mid-run, and it resolved with only the duplicate payment `UPI4021000702` refunded and verified (83 s).
   - Observations:
     - Groq runs took 44–83 s, probably because free-tier token-per-minute limits trigger `retry-after` waits.
-    - In TKT-1007 Groq said the refund would arrive "within 2–3 business days". No tool supplied that timeline. The refund itself was verified, so this is a wording issue, not a safety one. A future fix is to add the expected timeline to the `issue_refund` result, so the model has a real figure to quote.
+    - In TKT-1007 Groq said the refund would arrive "within 2–3 business days". No tool supplied that timeline. The refund itself was verified, so this is a wording issue, not a safety one. **Fixed:** `issue_refund` now returns `expected_credit: "within 1-2 working days"`, taken from a single constant, `policy.REFUND_CREDIT_ETA`, which also feeds the policy text and the rules and human-approval replies. The system prompt tells the model to quote it word for word and give no other timeline. Live recheck on Groq: TKT-1001's reply quoted "within 1-2 working days" exactly.
+    - Remaining limit: this relies on the prompt, so a model could still paraphrase. No code guard checks timelines in replies.
+  - **Groq `gpt-oss` glitch, found live:** the model sometimes calls a non-existent tool (`commentary`), and Groq rejects that with a 400 "Tool call validation failed". In one run this happened on the final reply turn, so the refund was verified and the ticket resolved, but **the customer was never told**. These 400s are now retried with a fresh sample (up to 3 attempts, with a test). The recheck run resolved cleanly.
+    - Open gap: a run that fails *after* resolving a ticket does not escalate, because `_system_escalate` skips resolved tickets, so a missing customer reply would go unnoticed. A follow-up should flag resolved tickets that have no agent reply.
 - [x] `.env` repair: the Gemini key line contained the key pasted 4 times. It was restored to the single 53-character key, after Google confirmed it (HTTP 200).
 - [ ] Ollama: pull a 7B+ tool-capable model (e.g. `qwen2.5:7b-instruct`, about 4.7 GB) for a useful offline fallback.
 - [x] **Live Gemini test (2026-10-24, free-tier key):**

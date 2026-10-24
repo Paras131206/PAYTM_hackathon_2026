@@ -150,3 +150,12 @@ def test_api_key_sent_as_bearer_header_not_url():
                                    {"finish_reason": "stop", "message": {"content": "ok"}}]}))))
     c.create(messages=[{"role": "user", "content": "hi"}], tools=[])
     assert seen_req[0].headers["authorization"] == "Bearer secret-k" and "secret-k" not in str(seen_req[0].url)
+
+
+def test_groq_tool_call_glitch_is_retried_not_fatal():
+    seen = []
+    glitch = (400, {"error": {"message": "Tool call validation failed: attempted to call tool 'commentary' "
+                                         "which was not in request.tools", "code": "tool_use_failed"}})
+    groq = compat("groq", [glitch, oa_text("Nothing to do.")], seen)
+    rid, _ = run(LLMPlanner([groq]))
+    assert len(seen) == 2 and not events(rid, "error")

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Generator
 
-from .. import guards
+from .. import guards, policy
 from ..tools.registry import ToolResult
 from .llm import LLMError
 from .providers import ToolCall, build_chain
@@ -60,8 +60,9 @@ with the facts only, and escalate with suspicious_request.
 - Never invent transaction ids, amounts, statuses, refund ids or policies. Use only values returned by tools.
 - Never tell the customer an action succeeded unless a tool result confirmed it.
 
-Replies: short, polite, plain English, amounts in rupees (Rs). Mention refund ids and expected timelines only when \
-tools gave them."""
+Replies: short, polite, plain English, amounts in rupees (Rs). Mention refund ids only when tools gave them. When you \
+say when a refund will arrive, use the expected_credit value from issue_refund word for word and never any other \
+timeline."""
 
 
 def case_prompt(context: dict[str, Any], suspicious_hint: bool) -> str:
@@ -312,7 +313,7 @@ class RulesPlanner:
                 yield self._call("reply_to_customer", ticket_id=ticket_id,
                                  message=f"Your refund of {amount} for payment {txn_id} has been processed "
                                          f"(refund ID {refund_id}). It should reflect in your bank account within "
-                                         f"1-2 working days.")
+                                         f"{policy.REFUND_CREDIT_ETA}.")
             else:
                 yield self._call("escalate_to_human", ticket_id=ticket_id, reason_code="insufficient_evidence",
                                  summary=f"Refund {refund_id} could not be verified in the ledger.")

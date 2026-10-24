@@ -61,6 +61,7 @@ def test_refund_success_persists_before_and_after_state_and_is_idempotent():
     assert execute(ctx, "check_switch_status", {"txn_id": "UPI4021000101"}).data["switch_status"] == "FAILED"
     r1 = execute(ctx, "issue_refund", {"txn_id": "UPI4021000101", "reason": "failed_debit"})
     assert r1.status == "ok" and r1.data["amount_rupees"] == 450
+    assert r1.data["expected_credit"] == "within 1-2 working days"  # the only timeline models may quote
     after = db.query_one("SELECT reversed, reversal_ref FROM transactions WHERE id = 'UPI4021000101'")
     assert after == {"reversed": 1, "reversal_ref": r1.data["refund_id"]}
     r2 = execute(ctx, "issue_refund", {"txn_id": "UPI4021000101", "reason": "failed_debit"})

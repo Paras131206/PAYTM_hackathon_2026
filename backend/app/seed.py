@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from . import db
 from .config import iso, utcnow
+from .policy import REFUND_CREDIT_ETA
 
 POLICIES = [
     {
@@ -19,7 +20,8 @@ POLICIES = [
             "If the customer's bank account was debited but the payment switch reports the payment as FAILED, "
             "the full amount is refunded to the source account. Reference: RBI TAT harmonisation circular "
             "(20 Sep 2019) requires auto-reversal by T+1 for UPI. Refunds up to the auto-refund limit may be issued "
-            "by the AI teammate; larger refunds need human approval."
+            "by the AI teammate; larger refunds need human approval. "
+            f"Refunds reach the source account within {REFUND_CREDIT_ETA}."
         ),
     },
     {

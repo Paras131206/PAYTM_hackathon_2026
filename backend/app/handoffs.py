@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from . import context as ctxsvc
-from . import db
+from . import db, policy
 from .config import iso, utcnow
 from .tools.registry import RunContext, create_handoff, execute
 
@@ -87,8 +87,8 @@ def decide(handoff_id: int, decision: Decision, reviewer: str, note: str) -> dic
                 execute(ctx, "reply_to_customer", {
                     "ticket_id": ticket["id"],
                     "message": f"Good news: your refund of Rs {res.data.get('amount_rupees', 0):,.0f} has been "
-                               f"approved and processed (refund ID {refund_id}). It should reflect in 1-2 working "
-                               f"days." + (f" Note from our team: {note}" if note else "")})
+                               f"approved and processed (refund ID {refund_id}). It should reflect in "
+                               f"{policy.REFUND_CREDIT_ETA}." + (f" Note from our team: {note}" if note else "")})
                 outcome = "resolved"
             else:
                 # Hand the ticket back to the queue as a new escalation so a human still owns it.

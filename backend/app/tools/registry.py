@@ -257,7 +257,8 @@ def t_issue_refund(ctx: RunContext, a: IssueRefundIn) -> ToolResult:
 
     human_approved = ctx.approved_handoff_id is not None and ctx.actor.startswith("human:")
     if decision.decision == "already_done":
-        return ToolResult("already_done", {"refund": existing, "reversed": bool(txn["reversed"])},
+        return ToolResult("already_done", {"refund": existing, "reversed": bool(txn["reversed"]),
+                                           "expected_credit": f"within {policy.REFUND_CREDIT_ETA}"},
                           decision.explanation)
     if decision.decision == "needs_approval" and not human_approved:
         handoff_id, created = create_handoff(
@@ -281,8 +282,10 @@ def t_issue_refund(ctx: RunContext, a: IssueRefundIn) -> ToolResult:
                                            created_by=ctx.actor, handoff_id=ctx.approved_handoff_id)
     return ToolResult("ok" if created else "already_done",
                       {"refund_id": refund["id"], "amount_rupees": refund["amount_paise"] / 100,
-                       "ledger_status": refund["status"], "rail": "sandbox_refund_ledger", "created": created},
-                      "Refund written to the sandbox ledger. Call verify_refund before telling the customer.")
+                       "ledger_status": refund["status"], "rail": "sandbox_refund_ledger", "created": created,
+                       "expected_credit": f"within {policy.REFUND_CREDIT_ETA}"},
+                      "Refund written to the sandbox ledger. Call verify_refund before telling the customer. "
+                      "If you tell the customer when it arrives, quote expected_credit exactly.")
 
 
 def t_verify_refund(ctx: RunContext, a: VerifyRefundIn) -> ToolResult:

@@ -119,6 +119,8 @@ class OpenAICompatClient:
                 raise LLMError("timeout", f"The {self.name} request timed out.") from e
             except httpx.HTTPError as e:
                 raise LLMError("connection_error", f"Could not reach {self.name}: {e}") from e
+            if _tool_call_glitch(r) and attempt < attempts - 1:
+                continue  # the model emitted a call to a tool that doesn't exist; a fresh sample usually doesn't
             if (r.status_code == 429 or r.status_code >= 500) and attempt < attempts - 1:
                 delay = _retry_after(r)
                 if delay and delay > 60:  # quota window too long to wait inside a run
@@ -139,6 +141,11 @@ class OpenAICompatClient:
         if finish not in {"stop", "tool_calls", None}:
             raise LLMError("unexpected_stop", f"{self.name} stopped with {finish!r}; treating the run as failed.")
         return choice.get("message") or {}
+
+
+def _tool_call_glitch(r: httpx.Response) -> bool:
+    """Groq rejects a sample whose tool call is malformed or names an unknown tool (seen live with gpt-oss)."""
+    return r.status_code == 400 and "tool call validation failed" in _openai_error_message(r).lower()
 
 
 def _retry_after(r: httpx.Response) -> float | None:
