@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS refunds (
 CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ticket_id TEXT NOT NULL REFERENCES tickets(id),
-    engine TEXT NOT NULL,                -- claude | rules | human
+    engine TEXT NOT NULL,                -- llm | rules | human
     model TEXT,
     status TEXT NOT NULL,                -- queued | running | finished | failed
     outcome TEXT,                        -- resolved | pending_approval | escalated | awaiting_customer | waiting_on_bank | closed | failed

@@ -160,3 +160,24 @@ def test_daily_quota_fails_fast(monkeypatch):
         {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "79525s"}]}}
     rid, out, seen = run_with([(429, daily)])
     assert slept == [] and len(seen) == 1 and events(rid, "error")[0]["code"] == "rate_limited"
+
+
+def test_turn_budget_enforced(monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "max_agent_turns", 3)
+    loop = [(200, candidate([fc("lookup_transaction", {"txn_id": "UPI4021000101"})]))] * 5
+    rid, out, _ = run_with(loop)
+    assert out == "escalated" and any(g["check"] == "turn_budget" for g in events(rid, "guard"))
+
+
+def test_unverified_refund_claim_from_model_is_blocked():
+    responses = [
+        (200, candidate([fc("record_assessment", ASSESS)])),
+        (200, candidate([fc("reply_to_customer", {"ticket_id": "TKT-1001",
+                                                  "message": "Your refund has been processed."})])),
+        (200, candidate([{"text": "done"}])),
+    ]
+    rid, out, _ = run_with(responses)
+    blocked = [r["data"].get("code") for r in events(rid, "tool_result") if r["status"] == "blocked"]
+    assert blocked == ["unverified_claim"] and out == "escalated"
+    assert not db.query("SELECT * FROM messages WHERE role = 'agent'")

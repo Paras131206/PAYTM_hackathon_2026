@@ -15,24 +15,12 @@ REPO_DIR = BACKEND_DIR.parent
 load_dotenv(REPO_DIR / ".env", override=False)
 
 
-def _bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None or raw == "":
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def claude_credentials_present() -> bool:
-    return bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN"))
-
-
 def gemini_api_key() -> str:
     return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
 
 
 def _llm_keys_present() -> bool:
-    return any(os.getenv(k) for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY", "GOOGLE_API_KEY",
-                                      "GROQ_API_KEY", "CEREBRAS_API_KEY", "OLLAMA_MODEL"))
+    return any(os.getenv(k) for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GROQ_API_KEY", "OLLAMA_MODEL"))
 
 
 @dataclass
@@ -41,19 +29,13 @@ class Settings:
     # auto | llm | rules. "auto" is resolved ONCE at startup: llm if any provider is configured, else rules.
     # "llm" runs the LLM_PROVIDERS chain in order, failing over to the next provider on quota/outage errors.
     agent_engine: str = field(default_factory=lambda: os.getenv("AGENT_ENGINE", "auto").strip().lower())
-    anthropic_model: str = field(default_factory=lambda: os.getenv("ANTHROPIC_MODEL", "claude-opus-5-5"))
-    anthropic_effort: str = field(default_factory=lambda: os.getenv("ANTHROPIC_EFFORT", "medium"))
-    anthropic_timeout_s: float = field(default_factory=lambda: float(os.getenv("ANTHROPIC_TIMEOUT_S", "90")))
-    anthropic_refusal_fallback: bool = field(default_factory=lambda: _bool("ANTHROPIC_REFUSAL_FALLBACK", True))
     gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.6-flash"))
     gemini_timeout_s: float = field(default_factory=lambda: float(os.getenv("GEMINI_TIMEOUT_S", "90")))
     llm_providers: list[str] = field(default_factory=lambda: [
-        p.strip().lower() for p in os.getenv("LLM_PROVIDERS", "gemini,groq,cerebras,ollama,claude").split(",")
+        p.strip().lower() for p in os.getenv("LLM_PROVIDERS", "gemini,groq,ollama").split(",")
         if p.strip()])
     groq_api_key: str = field(default_factory=lambda: os.getenv("GROQ_API_KEY", ""))
     groq_model: str = field(default_factory=lambda: os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
-    cerebras_api_key: str = field(default_factory=lambda: os.getenv("CEREBRAS_API_KEY", ""))
-    cerebras_model: str = field(default_factory=lambda: os.getenv("CEREBRAS_MODEL", "gpt-oss-120b"))
     ollama_model: str = field(default_factory=lambda: os.getenv("OLLAMA_MODEL", ""))  # empty = Ollama not used
     ollama_base_url: str = field(default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"))
     ollama_timeout_s: float = field(default_factory=lambda: float(os.getenv("OLLAMA_TIMEOUT_S", "180")))
@@ -70,7 +52,7 @@ class Settings:
     def __post_init__(self) -> None:
         if self.agent_engine not in {"auto", "llm", "rules"}:
             raise ValueError(f"AGENT_ENGINE must be auto|llm|rules, got {self.agent_engine!r}")
-        unknown = set(self.llm_providers) - {"claude", "gemini", "groq", "cerebras", "ollama"}
+        unknown = set(self.llm_providers) - {"gemini", "groq", "ollama"}
         if unknown:
             raise ValueError(f"LLM_PROVIDERS has unknown providers: {sorted(unknown)}")
         if self.agent_engine == "auto":

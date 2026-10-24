@@ -1,7 +1,7 @@
 from app import db
 from app.agent.orchestrator import create_run
 from app.tools import adapters
-from app.tools.registry import TOOLS, RunContext, anthropic_tool_definitions, execute
+from app.tools.registry import TOOLS, RunContext, execute, gemini_tool_definitions, openai_tool_definitions
 
 
 def make_ctx(ticket="TKT-1001", customer="CUST-001", assessed=True):
@@ -121,10 +121,11 @@ def test_large_refund_goes_to_approval_queue_once():
     assert db.query_one("SELECT status FROM tickets WHERE id = 'TKT-1002'")["status"] == "pending_approval"
 
 
-def test_tool_definitions_are_strict():
-    defs = anthropic_tool_definitions()
-    assert {d["name"] for d in defs} == set(TOOLS)
-    for d in defs:
-        s = d["input_schema"]
-        assert d["strict"] is True and s["additionalProperties"] is False
-        assert set(s["required"]) == set(s["properties"])
+def test_tool_definitions_cover_every_tool_with_all_fields_required():
+    oa = [d["function"] for d in openai_tool_definitions()]
+    gm = gemini_tool_definitions()[0]["functionDeclarations"]
+    assert {d["name"] for d in oa} == {d["name"] for d in gm} == set(TOOLS)
+    for d in oa:
+        s = d["parameters"]
+        assert s["additionalProperties"] is False and set(s["required"]) == set(s["properties"])
+    assert all("additionalProperties" not in d["parameters"] for d in gm)  # unsupported by Gemini

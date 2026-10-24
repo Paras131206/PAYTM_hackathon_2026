@@ -1,6 +1,6 @@
 """Tool registry: typed schemas, argument validation, permission checks, retries, idempotency and audit events.
 
-Every planner (Claude or rules) and every human approval goes through `execute()`. Nothing else may call a
+Every planner (LLM or rules) and every human approval goes through `execute()`. Nothing else may call a
 tool handler directly.
 """
 from __future__ import annotations
@@ -417,7 +417,7 @@ TOOLS: dict[str, ToolSpec] = {
 
 
 def _strict_schema(model: type[_In]) -> dict[str, Any]:
-    """A minimal JSON schema accepted by strict tool use: every property required, no extras."""
+    """A minimal JSON schema: every property required, no extras."""
     props: dict[str, Any] = {}
     for name, f in model.model_fields.items():
         ann = f.annotation
@@ -446,16 +446,9 @@ def gemini_tool_definitions() -> list[dict[str, Any]]:
 
 
 def openai_tool_definitions() -> list[dict[str, Any]]:
-    """OpenAI-compatible tools (Groq, Cerebras, Ollama)."""
+    """OpenAI-compatible tools (Groq, Ollama)."""
     return [{"type": "function", "function": {"name": s.name, "description": s.description,
                                               "parameters": _strict_schema(s.input_model)}} for s in TOOLS.values()]
-
-
-def anthropic_tool_definitions() -> list[dict[str, Any]]:
-    return [
-        {"name": s.name, "description": s.description, "input_schema": _strict_schema(s.input_model), "strict": True}
-        for s in TOOLS.values()
-    ]
 
 
 def execute(ctx: RunContext, name: str, raw_args: Any) -> ToolResult:

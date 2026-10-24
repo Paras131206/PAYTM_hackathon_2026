@@ -1,4 +1,4 @@
-"""Provider failover: Gemini -> OpenAI-compatible (Groq/Cerebras/Ollama) mid-run, with mocked HTTP. No network."""
+"""Provider failover: Gemini -> OpenAI-compatible (Groq/Ollama) mid-run, with mocked HTTP. No network."""
 import json
 
 import httpx
@@ -131,13 +131,13 @@ def test_unparseable_tool_arguments_are_rejected_not_executed():
 
 
 def test_chain_order_and_configuration(monkeypatch):
-    monkeypatch.setattr(settings, "llm_providers", ["gemini", "groq", "cerebras", "ollama"])
+    monkeypatch.setattr(settings, "llm_providers", ["groq", "gemini", "ollama"])
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     monkeypatch.setattr(settings, "groq_api_key", "")
-    monkeypatch.setattr(settings, "cerebras_api_key", "c")
     monkeypatch.setattr(settings, "ollama_model", "qwen2.5:3b-instruct")
-    assert configured_chain() == ["gemini", "cerebras", "ollama"]
-    assert [p.name for p in build_chain()] == ["gemini", "cerebras", "ollama"]
+    assert configured_chain() == ["gemini", "ollama"]          # unconfigured groq skipped, order kept
+    monkeypatch.setattr(settings, "groq_api_key", "gsk_x")
+    assert [p.name for p in build_chain()] == ["groq", "gemini", "ollama"]
     ollama = build_chain()[-1]
     assert ollama.client._url == "http://localhost:11434/v1/chat/completions" and not ollama.client._headers
 

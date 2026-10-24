@@ -15,7 +15,7 @@ This file is the authoritative engineering instruction file for any AI coding ag
 |---|---|---|
 | `backend/app/agent/llm.py` | HTTP/SDK clients for every LLM provider; error mapping to `LLMError` codes | Contain business rules or tool logic |
 | `backend/app/agent/providers.py` | Provider-neutral history and per-provider rendering; the configured chain | Decide policy or execute tools |
-| `backend/app/agent/planners.py` | Proposing tool calls (Claude or rules) | Write to the DB, decide policy, or execute tools |
+| `backend/app/agent/planners.py` | Proposing tool calls (LLM chain or rules) | Write to the DB, decide policy, or execute tools |
 | `backend/app/agent/orchestrator.py` | Run lifecycle, turn budget, outcome derived from persisted state | Trust planner text for outcomes |
 | `backend/app/policy.py` | Pure deterministic refund rules | Do any I/O or call an LLM |
 | `backend/app/guards.py` | Deterministic injection, human-request and claim detection | — |
@@ -66,17 +66,14 @@ Write tools must be idempotent, or keyed so that retries are visible and counted
 
 ## 6. LLM configuration rules
 
-- Providers: Gemini (REST), Groq / Cerebras / Ollama (OpenAI-compatible `chat/completions`), and Claude (official SDK). Clients live in `agent/llm.py`, rendering in `agent/providers.py`. Engines are `llm` (the `LLM_PROVIDERS` chain) and `rules`.
+- Providers: Gemini (REST) and Groq / Ollama (OpenAI-compatible `chat/completions`), free tiers or local only. Do not add paid providers without the team's approval. Clients live in `agent/llm.py`, rendering in `agent/providers.py`. Engines are `llm` (the `LLM_PROVIDERS` chain) and `rules`.
 - Failover: forward only, and only on availability codes (`FAILOVER_CODES` in `planners.py`). Never on `refusal`, `truncated`, `bad_request` or `unexpected_stop`. Every switch is emitted as an `llm_failover` event, and `runs.model` lists the models that answered. Never fail over to the rules engine.
 - A provider replays its own earlier turns verbatim (`Turn.raw`). Other providers' turns are rendered from the neutral history.
 - Do not loosen tool schemas to accommodate weak models. Validation is a trust boundary.
 - Gemini: send the key in the `x-goog-api-key` header (never in the URL). Replay the model's `content` verbatim (it carries thought signatures). Return every `functionResponse` in one user turn. Don't send `additionalProperties` in function schemas. Any `finishReason` other than STOP is an `LLMError`.
-- Default model `claude-opus-5-5`, overridable with `ANTHROPIC_MODEL`. Use `output_config.effort` from `ANTHROPIC_EFFORT`.
-- Do not send `temperature`, `top_p` or `top_k` (they are rejected). Do not force `tool_choice` (it returns a 400 on Opus 5.5). Tools are `strict: true`.
-- Manual tool loop: append the assistant `content` exactly as returned, and return **all** `tool_result` blocks in **one** user message with matching ids. Use `is_error: true` for errors.
 - Customer text goes inside `<untrusted_customer_content>`. The system prompt states that it is data. Permissions are enforced in code regardless of what the model does.
 - Errors map to `LLMError(code)`, and the run fails and escalates. **There is no fabricated fallback.**
-- Unit tests use `tests/conftest.py::FakeAnthropic` and an `httpx.MockTransport` for Gemini. Never call a live API from tests.
+- Unit tests use `httpx.MockTransport` for every provider. Never call a live API from tests.
 
 ## 7. Dependency management
 

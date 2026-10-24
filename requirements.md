@@ -21,14 +21,13 @@ No database server is needed. SQLite is part of the Python standard library.
 | fastapi | ==0.162.0 | HTTP API, request validation, background tasks | `app/api.py` | Brings in Starlette 1.9.0. |
 | uvicorn[standard] | ==0.54.0 | ASGI server | how you start the backend | `[standard]` adds uvloop and httptools for speed. |
 | pydantic | ==2.14.1 | Typed tool input schemas, API bodies | `tools/registry.py`, `api.py` | v2 API (`model_validate`, `ConfigDict`). |
-| anthropic | ==2.3.0 | Official Claude SDK | `agent/llm.py` only | Built on `httpx2`. This is the only module that imports it. |
 | python-dotenv | ==1.2.4 | Loads `.env` from the repo root | `app/config.py` | Real environment variables take precedence. |
-| httpx | ==0.28.1 | Gemini and OpenAI-compatible (Groq, Cerebras, Ollama) clients, and `fastapi.testclient` | `agent/llm.py`, `tests/` | The anthropic SDK uses `httpx2`, a separate package. |
+| httpx | ==0.28.1 | Gemini and OpenAI-compatible (Groq, Ollama) clients, and `fastapi.testclient` | `agent/llm.py`, `tests/` | |
 | pytest | ==9.1.1 | Test runner | `backend/tests/` | Test-only. |
 
 **Why no Google SDK:** `pip install google-genai` timed out repeatedly against PyPI from the build machine. The Gemini adapter therefore calls the documented REST endpoint (`v1beta/models/{model}:generateContent`) through `httpx`, which was already a dependency. Switching to the SDK later only touches `GeminiClient` in `agent/llm.py`.
 
-Not used on purpose: the `openai` SDK (Groq, Cerebras and Ollama are called with plain `httpx`; the request is one JSON POST), SQLAlchemy (plain `sqlite3` is enough for this schema), agent frameworks (the tool loop is about 60 lines and fully visible), vector databases (context is fetched by indexed SQL lookups), pandas.
+Not used on purpose: the `anthropic` SDK (removed with the Claude provider), the `openai` SDK (Groq and Ollama are called with plain `httpx`; the request is one JSON POST), SQLAlchemy (plain `sqlite3` is enough for this schema), agent frameworks (the tool loop is about 60 lines and fully visible), vector databases (context is fetched by indexed SQL lookups), pandas.
 
 ### Install
 
@@ -64,12 +63,10 @@ npm ci
 
 ## Compatibility notes
 
-- `anthropic` 2.x: `temperature`, `top_p` and `top_k` are rejected by the API (as of 2026-10-21), so the adapter never sends them. Forced `tool_choice` returns a 400 on `claude-opus-5-5`, so the adapter uses `auto` with `strict: true` tools.
-- The refusal fallback uses the beta header `server-side-fallback-2026-07-01`. If your account rejects it, set `ANTHROPIC_REFUSAL_FALLBACK=0`.
 - TypeScript 7 is the native compiler. If your editor's TypeScript plugin expects 5.x, keep using `npm run typecheck` as the source of truth.
 
 ## Verification status
 
 - The Python install above was run on this machine, and `pytest` passed (see steps.md §15).
 - `npm install` was run, and `npm run build` (typecheck plus Vite build) passed.
-- No live Gemini or Anthropic call has been made from this machine yet, because no API key is configured. See runthrough.md §4.
+- Live calls verified on this machine: Gemini (several models) and local Ollama. Groq is pending its key. See steps.md §15.

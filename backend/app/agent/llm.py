@@ -1,4 +1,4 @@
-"""Claude provider adapter. This is the only module that imports the Anthropic SDK.
+"""LLM provider clients (Gemini REST, OpenAI-compatible for Groq and Ollama). All provider HTTP lives here.
 
 Failures are raised as LLMError. There is no fallback to fabricated output: a failed call fails the run.
 """
@@ -7,69 +7,15 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import anthropic
 import httpx
 
-from ..config import claude_credentials_present, gemini_api_key, settings
+from ..config import gemini_api_key, settings
 
 
 class LLMError(Exception):
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code = code
-
-
-class ClaudeClient:
-    def __init__(self, client: Any | None = None):
-        if client is None:
-            if not claude_credentials_present():
-                raise LLMError("missing_credentials",
-                               "ANTHROPIC_API_KEY is not set. Set it in .env or choose the rules engine.")
-            client = anthropic.Anthropic(timeout=settings.anthropic_timeout_s, max_retries=2)
-        self._client = client
-        self.model = settings.anthropic_model
-
-    def create(self, *, system: str, messages: list[dict], tools: list[dict]) -> Any:
-        kwargs: dict[str, Any] = dict(
-            model=self.model,
-            max_tokens=16000,
-            system=system,
-            messages=messages,
-            tools=tools,
-            tool_choice={"type": "auto"},
-            output_config={"effort": settings.anthropic_effort},
-        )
-        if settings.anthropic_refusal_fallback:
-            # Server-side refusal fallback (opt-in): on a policy decline the API re-runs on a fallback model.
-            kwargs["betas"] = ["server-side-fallback-2026-07-01"]
-            kwargs["fallbacks"] = "default"
-        try:
-            response = self._client.beta.messages.create(**kwargs)
-        except anthropic.AuthenticationError as e:
-            raise LLMError("auth_failed", f"Anthropic rejected the credentials: {e.message}") from e
-        except anthropic.PermissionDeniedError as e:
-            raise LLMError("permission_denied", e.message) from e
-        except anthropic.NotFoundError as e:
-            raise LLMError("model_not_found", f"Model {self.model!r} not available: {e.message}") from e
-        except anthropic.RateLimitError as e:
-            raise LLMError("rate_limited", "Anthropic rate limit hit (after SDK retries).") from e
-        except anthropic.BadRequestError as e:
-            raise LLMError("bad_request", e.message) from e
-        except anthropic.APITimeoutError as e:
-            raise LLMError("timeout", "The Anthropic request timed out.") from e
-        except anthropic.APIConnectionError as e:
-            raise LLMError("connection_error", "Could not reach the Anthropic API.") from e
-        except anthropic.APIStatusError as e:
-            raise LLMError("api_error", f"Anthropic API error {e.status_code}: {e.message}") from e
-
-        stop = getattr(response, "stop_reason", None)
-        if stop == "refusal":
-            raise LLMError("refusal", "The model declined this request.")
-        if stop == "max_tokens":
-            raise LLMError("truncated", "The model response hit max_tokens.")
-        if stop not in {"end_turn", "tool_use", "stop_sequence"}:  # no server tools, so pause_turn is unexpected
-            raise LLMError("unexpected_stop", f"Model stopped with {stop!r}; treating the run as failed.")
-        return response
 
 
 # ---------------------------------------------------------------------------------------------------- Gemini
@@ -154,7 +100,7 @@ def _gemini_error_message(r: httpx.Response) -> str:
 
 # ---------------------------------------------------------------------------------- OpenAI-compatible (Groq etc.)
 class OpenAICompatClient:
-    """POST {base_url}/chat/completions. Groq, Cerebras and Ollama all speak this format."""
+    """POST {base_url}/chat/completions. Groq and Ollama both speak this format."""
 
     def __init__(self, *, name: str, base_url: str, model: str, api_key: str = "", timeout_s: float = 90,
                  http: httpx.Client | None = None):

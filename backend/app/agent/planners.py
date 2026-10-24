@@ -1,6 +1,6 @@
 """Planners propose the next tool calls. They never execute tools or decide policy themselves.
 
-- LLMPlanner (engine="llm"): an LLM chooses tools; providers (Gemini, Groq, Cerebras, Ollama, Claude) are tried in
+- LLMPlanner (engine="llm"): an LLM chooses tools; providers (Gemini, Groq, Ollama) are tried in
   LLM_PROVIDERS order and the run fails over to the next one on quota/outage errors. Every switch is audited.
 - RulesPlanner: a deterministic, keyword-based planner with NO LLM (engine="rules"). It exists so the product can
   be run and tested offline. It is always labelled as the rules engine and is never used as a hidden fallback.

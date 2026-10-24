@@ -286,8 +286,10 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
   - **Live:** a real Gemini 429 (exhausted `gemini-3.6-flash`) failed over to local Ollama `qwen2.5:3b-instruct` mid-run, and both models were recorded.
   - The 3B model left out the required `injection_suspected` field on every `record_assessment` call. Validation rejected it each time, so the agent could not act and the ticket was escalated with no refund. That is safe, but too weak to be useful: Ollama needs a 7B+ model.
 
+- [x] **Paid providers removed (2026-10-24, at the team's request):** Anthropic/Claude and Cerebras. Their code, tests, settings and the `anthropic` dependency are gone. The supported chain is now Gemini → Groq → Ollama (all free or local). 80 tests pass with the `anthropic` package uninstalled. Earlier entries in this file that mention Claude or Cerebras describe work that has since been removed.
+
 ### Blocked / pending
-- [ ] Groq and Cerebras need API keys (`GROQ_API_KEY`, `CEREBRAS_API_KEY`) before they can be tested live. Their default model names (`openai/gpt-oss-120b`, `gpt-oss-120b`) should be checked against each provider's `/models` list once keys exist.
+- [ ] Groq needs `GROQ_API_KEY` before it can be tested live. Check the default model (`openai/gpt-oss-120b`) against Groq's `/models` list once the key exists.
 - [ ] Ollama: pull a 7B+ tool-capable model (e.g. `qwen2.5:7b-instruct`, about 4.7 GB) for a useful offline fallback.
 - [x] **Live Gemini test (2026-10-24, free-tier key):**
   - The key is valid, with 46 models available.
