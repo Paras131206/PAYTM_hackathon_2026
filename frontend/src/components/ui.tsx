@@ -1,9 +1,13 @@
 import type { ReactNode } from "react";
 
-export type Tone = "ok" | "warn" | "bad" | "info" | "neutral" | "accent";
+export type Tone = "ok" | "warn" | "bad" | "info" | "neutral" | "accent" | "paytm";
 
 export function Badge({ tone = "neutral", children, title }: { tone?: Tone; children: ReactNode; title?: string }) {
-  return <span className={`badge ${tone}`} title={title}>{children}</span>;
+  return (
+    <span className={`badge ${tone}`} title={title}>
+      {children}
+    </span>
+  );
 }
 
 const STATUS_TONE: Record<string, Tone> = {
@@ -22,32 +26,64 @@ const STATUS_TONE: Record<string, Tone> = {
   handled: "neutral",
   finished: "ok",
   failed: "bad",
-  running: "info",
+  running: "paytm",
   queued: "info",
 };
 
 export function StatusBadge({ status }: { status: string | null | undefined }) {
   if (!status) return <Badge>—</Badge>;
-  return <Badge tone={STATUS_TONE[status] ?? "neutral"}>{status.replace(/_/g, " ")}</Badge>;
+  const tone = STATUS_TONE[status] ?? "neutral";
+  return (
+    <span className={`badge ${tone} status-pill`}>
+      <span className="dot" aria-hidden="true" />
+      <span>{status.replace(/_/g, " ")}</span>
+    </span>
+  );
 }
 
 export function EngineBadge({ engine, model }: { engine: string; model?: string | null }) {
-  if (engine === "llm") return <Badge tone="accent" title="LLM planner. Providers are tried in order; a quota or outage moves to the next one.">LLM · {model ?? "waiting for first answer"}</Badge>;
-  if (engine === "human") return <Badge tone="ok">Human · {model}</Badge>;
-  return <Badge tone="neutral" title="Deterministic keyword planner. No LLM is called.">Rules engine (no LLM)</Badge>;
+  if (engine === "llm") {
+    return (
+      <span
+        className="badge paytm engine-pill"
+        title="LLM planner. Providers are tried in order; a quota or outage moves to the next one."
+      >
+        <span className="dot" />
+        <span>LLM · {model ?? "waiting for first answer"}</span>
+      </span>
+    );
+  }
+  if (engine === "human") {
+    return (
+      <span className="badge ok engine-pill">
+        <span className="dot" />
+        <span>Human · {model}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="badge neutral engine-pill" title="Deterministic keyword planner. No LLM is called.">
+      <span className="dot" />
+      <span>Rules engine (no LLM)</span>
+    </span>
+  );
 }
 
 export function SandboxBadge() {
-  return <Badge tone="warn" title="Simulated against local SQLite. No real bank, switch or money movement.">SANDBOX</Badge>;
+  return (
+    <span className="badge warn sandbox-pill" title="Simulated against local SQLite. No real bank, switch or money movement.">
+      SANDBOX
+    </span>
+  );
 }
 
 export const rupees = (paise: number) =>
-  `Rs ${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 export function when(iso: string | null | undefined) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 export function ago(iso: string) {

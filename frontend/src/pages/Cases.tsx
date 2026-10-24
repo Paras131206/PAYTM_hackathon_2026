@@ -4,12 +4,24 @@ import { Timeline } from "../components/Timeline";
 import {
   Badge, Empty, EngineBadge, ErrorBanner, SandboxBadge, StatusBadge, ago, rupees, when,
 } from "../components/ui";
+import {
+  IconArrowRight,
+  IconCases,
+  IconChevronRight,
+  IconSparkles,
+} from "../components/PaytmIcons";
 import type { Customer, Engine, Health, RunDetail, TicketDetail, TicketListItem } from "../types";
 
 const ACTIVE = new Set(["queued", "running"]);
 const AGENT_RUNNABLE = new Set(["open", "in_progress", "awaiting_customer", "waiting_on_bank"]);
 
-export function Cases({ ticketId, health, onChange }: {
+type FilterTab = "all" | "actionable" | "awaiting" | "pending_approval" | "resolved" | "escalated";
+
+export function Cases({
+  ticketId,
+  health,
+  onChange,
+}: {
   ticketId: string | null;
   health: Health | null;
   onChange: () => void;
@@ -17,44 +29,148 @@ export function Cases({ ticketId, health, onChange }: {
   const [tickets, setTickets] = useState<TicketListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [filter, setFilter] = useState<FilterTab>("all");
 
   const loadList = useCallback(() => {
     api.tickets().then(setTickets).catch((e) => setError(e.message));
   }, []);
   useEffect(loadList, [loadList]);
 
-  const selected = ticketId ?? tickets?.[0]?.id ?? null;
+  const filteredTickets = (tickets ?? []).filter((t) => {
+    if (filter === "actionable") return AGENT_RUNNABLE.has(t.status);
+    if (filter === "awaiting") return t.status === "awaiting_customer";
+    if (filter === "pending_approval") return t.status === "pending_approval";
+    if (filter === "resolved") return t.status === "resolved" || t.status === "closed";
+    if (filter === "escalated") return t.status === "escalated";
+    return true;
+  });
+
+  // Auto-normalize ticket ID if TCK- was entered instead of TKT-
+  const normalizedId = ticketId?.replace(/^TCK-/i, "TKT-") ?? null;
+
+  useEffect(() => {
+    if (ticketId && /^TCK-/i.test(ticketId)) {
+      location.hash = `#/cases/${ticketId.replace(/^TCK-/i, "TKT-")}`;
+    }
+  }, [ticketId]);
+
+  const ticketExists = tickets ? tickets.some((t) => t.id === normalizedId) : true;
+  const selected = (normalizedId && ticketExists)
+    ? normalizedId
+    : (filteredTickets[0]?.id ?? tickets?.[0]?.id ?? null);
 
   return (
-    <div className="page">
+    <div className="page cases-page">
       <ErrorBanner error={error} />
-      <div className="cases">
-        <section className="card" aria-label="Support queue">
+      
+      <div className="cases-layout">
+        {/* Cases List Sidebar (Image 1 Screen 3 Style) */}
+        <section className="card ticket-sidebar-card" aria-label="Support cases list">
           <div className="card-h">
-            <h2>Support queue</h2>
-            <button className="btn sm" onClick={() => setCreating((v) => !v)}>{creating ? "Cancel" : "New case"}</button>
+            <div>
+              <h2>Support Cases</h2>
+              <span className="small muted">{filteredTickets.length} of {tickets?.length ?? 0} tickets</span>
+            </div>
+            <button className="btn sm primary pill-btn" onClick={() => setCreating((v) => !v)}>
+              {creating ? "Cancel" : "+ New Case"}
+            </button>
           </div>
-          {creating && <NewCase onCreated={(id) => { setCreating(false); loadList(); location.hash = `#/cases/${id}`; onChange(); }} />}
+
+          {creating && (
+            <NewCase
+              onCreated={(id) => {
+                setCreating(false);
+                loadList();
+                location.hash = `#/cases/${id}`;
+                onChange();
+              }}
+            />
+          )}
+
+          {/* Filter Pills (Image 1 Tab Bar) */}
+          <div className="filter-pills-bar" role="tablist" aria-label="Ticket status filters">
+            <button
+              className={`filter-pill ${filter === "all" ? "active" : ""}`}
+              onClick={() => setFilter("all")}
+            >
+              All
+            </button>
+            <button
+              className={`filter-pill ${filter === "actionable" ? "active" : ""}`}
+              onClick={() => setFilter("actionable")}
+            >
+              Actionable
+            </button>
+            <button
+              className={`filter-pill ${filter === "awaiting" ? "active" : ""}`}
+              onClick={() => setFilter("awaiting")}
+            >
+              Awaiting
+            </button>
+            <button
+              className={`filter-pill ${filter === "pending_approval" ? "active" : ""}`}
+              onClick={() => setFilter("pending_approval")}
+            >
+              Approval
+            </button>
+            <button
+              className={`filter-pill ${filter === "resolved" ? "active" : ""}`}
+              onClick={() => setFilter("resolved")}
+            >
+              Resolved
+            </button>
+          </div>
+
           <div className="ticket-list">
             {!tickets && <Empty><span className="spinner" /></Empty>}
-            {tickets?.length === 0 && <Empty>No tickets. Reset the demo to load scenarios.</Empty>}
-            {tickets?.map((t) => (
-              <a key={t.id} href={`#/cases/${t.id}`} className={`ticket-item ${t.id === selected ? "active" : ""}`}>
-                <div className="row small" style={{ justifyContent: "space-between" }}>
-                  <span className="mono muted">{t.id}</span>
-                  <StatusBadge status={t.status} />
+            {tickets && filteredTickets.length === 0 && (
+              <Empty>No tickets match this filter. Reset demo or select 'All'.</Empty>
+            )}
+            {filteredTickets.map((t) => (
+              <a
+                key={t.id}
+                href={`#/cases/${t.id}`}
+                className={`ticket-item-card ${t.id === selected ? "active" : ""}`}
+              >
+                <div className="ticket-item-icon">
+                  <IconCases />
                 </div>
-                <div className="s">{t.subject}</div>
-                <div className="p">{t.customer_name} · {t.first_message}</div>
-                {t.scenario && t.scenario !== "custom" && <div className="small muted" style={{ marginTop: 4 }}>{t.scenario}</div>}
+                <div className="ticket-item-body">
+                  <div className="ticket-item-header">
+                    <span className="mono ticket-id">{t.id}</span>
+                    <StatusBadge status={t.status} />
+                  </div>
+                  <div className="ticket-item-subject">{t.subject}</div>
+                  <div className="ticket-item-preview">
+                    {t.customer_name} · {t.first_message}
+                  </div>
+                  {t.scenario && t.scenario !== "custom" && (
+                    <div className="ticket-scenario-tag">{t.scenario}</div>
+                  )}
+                </div>
+                <div className="ticket-item-chevron">
+                  <IconChevronRight />
+                </div>
               </a>
             ))}
           </div>
         </section>
+
+        {/* Selected Workspace */}
         {selected ? (
-          <Workspace key={selected} ticketId={selected} health={health} onChange={() => { loadList(); onChange(); }} />
+          <Workspace
+            key={selected}
+            ticketId={selected}
+            health={health}
+            onChange={() => {
+              loadList();
+              onChange();
+            }}
+          />
         ) : (
-          <div className="card"><Empty>Select a ticket.</Empty></div>
+          <div className="card empty-workspace">
+            <Empty>Select a ticket to inspect context and run the agent.</Empty>
+          </div>
         )}
       </div>
     </div>
@@ -68,7 +184,11 @@ function NewCase({ onCreated }: { onCreated: (id: string) => void }) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { api.customers().then(setCustomers).catch((e) => setError(e.message)); }, []);
+
+  useEffect(() => {
+    api.customers().then(setCustomers).catch((e) => setError(e.message));
+  }, []);
+
   const submit = async () => {
     setBusy(true);
     setError(null);
@@ -81,23 +201,46 @@ function NewCase({ onCreated }: { onCreated: (id: string) => void }) {
       setBusy(false);
     }
   };
+
   return (
-    <div className="card-b stack" style={{ borderBottom: "1px solid var(--border)" }}>
-      <label className="small muted" htmlFor="nc-c">Customer (synthetic)</label>
+    <div className="card-b stack new-case-form">
+      <label className="small muted" htmlFor="nc-c">Select Customer (Synthetic Demo)</label>
       <select id="nc-c" className="input" value={customer} onChange={(e) => setCustomer(e.target.value)}>
-        {customers.map((c) => <option key={c.id} value={c.id}>{c.id} · {c.name}</option>)}
+        {customers.map((c) => (
+          <option key={c.id} value={c.id}>{c.id} · {c.name}</option>
+        ))}
       </select>
-      <input className="input" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} aria-label="Subject" />
-      <textarea className="input" placeholder="Customer message" value={body} onChange={(e) => setBody(e.target.value)} aria-label="Customer message" />
+      <input
+        className="input"
+        placeholder="Subject (e.g. ₹650 debited at Big Bazaar)"
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        aria-label="Subject"
+      />
+      <textarea
+        className="input"
+        placeholder="Customer complaint message..."
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        aria-label="Customer message"
+      />
       <ErrorBanner error={error} />
-      <button className="btn primary" disabled={busy || !body.trim()} onClick={submit}>
-        {busy ? "Creating…" : "Create and run agent"}
+      <button className="btn primary pill-btn" disabled={busy || !body.trim()} onClick={submit}>
+        {busy ? "Creating…" : "Create & Run Resolv →"}
       </button>
     </div>
   );
 }
 
-function Workspace({ ticketId, health, onChange }: { ticketId: string; health: Health | null; onChange: () => void }) {
+function Workspace({
+  ticketId,
+  health,
+  onChange,
+}: {
+  ticketId: string;
+  health: Health | null;
+  onChange: () => void;
+}) {
   const [detail, setDetail] = useState<TicketDetail | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
   const [run, setRun] = useState<RunDetail | null>(null);
@@ -108,7 +251,9 @@ function Workspace({ ticketId, health, onChange }: { ticketId: string; health: H
   const [beforeReversed, setBeforeReversed] = useState<Set<string>>(new Set());
   const timer = useRef<number | null>(null);
 
-  useEffect(() => { if (health) setEngine(health.engine); }, [health]);
+  useEffect(() => {
+    if (health) setEngine(health.engine);
+  }, [health]);
 
   const loadDetail = useCallback(async () => {
     const d = await api.ticket(ticketId);
@@ -125,7 +270,6 @@ function Workspace({ ticketId, health, onChange }: { ticketId: string; health: H
       .catch((e) => setError(e.message));
   }, [loadDetail]);
 
-  // Poll the selected run while it is active; refresh the ticket when it finishes.
   useEffect(() => {
     if (runId === null) { setRun(null); return; }
     let cancelled = false;
@@ -145,7 +289,10 @@ function Workspace({ ticketId, health, onChange }: { ticketId: string; health: H
       }
     };
     tick();
-    return () => { cancelled = true; if (timer.current) window.clearTimeout(timer.current); };
+    return () => {
+      cancelled = true;
+      if (timer.current) window.clearTimeout(timer.current);
+    };
   }, [runId, loadDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startRun = async () => {
@@ -177,7 +324,30 @@ function Workspace({ ticketId, health, onChange }: { ticketId: string; health: H
     }
   };
 
-  if (!detail) return <div className="card"><ErrorBanner error={error} />{!error && <Empty><span className="spinner" /></Empty>}</div>;
+  if (!detail) {
+    return (
+      <div className="card workspace-card" style={{ padding: 24 }}>
+        <ErrorBanner error={error} />
+        {error ? (
+          <div style={{ marginTop: 14 }}>
+            <p className="muted small">
+              The ticket <code>{ticketId}</code> could not be loaded. You can select another case from the sidebar or click below:
+            </p>
+            <button
+              className="btn primary sm pill-btn"
+              onClick={() => {
+                location.hash = "#/cases/TKT-1001";
+              }}
+            >
+              Open Case TKT-1001 →
+            </button>
+          </div>
+        ) : (
+          <Empty><span className="spinner" /></Empty>
+        )}
+      </div>
+    );
+  }
 
   const t = detail.ticket;
   const running = run ? ACTIVE.has(run.run.status) : false;
@@ -185,83 +355,151 @@ function Workspace({ ticketId, health, onChange }: { ticketId: string; health: H
   const pending = detail.handoffs.filter((h) => h.status === "pending");
 
   return (
-    <div className="stack" style={{ gap: 12 }}>
-      <section className="card">
-        <div className="card-h" style={{ flexWrap: "wrap" }}>
+    <div className="stack workspace-stack">
+      {/* Ticket Action Header */}
+      <section className="card ticket-header-card">
+        <div className="ticket-header-main">
           <div className="grow">
-            <div className="row small muted"><span className="mono">{t.id}</span> · opened {ago(t.created_at)} · {t.channel.replace("_", " ")}</div>
-            <div className="row"><h1>{t.subject}</h1><StatusBadge status={t.status} />
-              {t.priority === "high" && <Badge tone="bad">high priority</Badge>}</div>
-            {t.scenario && t.scenario !== "custom" && <div className="small muted">Demo scenario: {t.scenario}</div>}
+            <div className="row small muted">
+              <span className="mono ticket-id-badge">{t.id}</span>
+              <span>· opened {ago(t.created_at)}</span>
+              <span>· {t.channel.replace("_", " ")}</span>
+            </div>
+            <div className="row" style={{ marginTop: 4 }}>
+              <h1 className="ticket-title">{t.subject}</h1>
+              <StatusBadge status={t.status} />
+              {t.priority === "high" && <Badge tone="bad">high priority</Badge>}
+            </div>
+            {t.scenario && t.scenario !== "custom" && (
+              <div className="small muted" style={{ marginTop: 4 }}>
+                Scenario: <strong>{t.scenario}</strong>
+              </div>
+            )}
           </div>
-          <div className="row">
-            <label className="small muted" htmlFor="engine">Engine</label>
-            <select id="engine" className="input" style={{ width: "auto" }} value={engine}
-              onChange={(e) => setEngine(e.target.value as Engine)}>
-              <option value="llm" disabled={!health?.llm_configured}>
-                LLM with failover{health?.llm_configured ? "" : " (no provider configured)"}
-              </option>
-              <option value="rules">Rules engine (no LLM)</option>
-            </select>
-            <button className="btn primary" onClick={startRun} disabled={busy || running || !runnable}
-              title={runnable ? "Run the AI teammate on this ticket" : `Ticket is ${t.status}; a human owns it`}>
-              {running ? "Working…" : "Run Resolv"}
+
+          <div className="ticket-controls-box">
+            <div className="engine-select-wrap">
+              <label className="small muted" htmlFor="engine">Engine</label>
+              <select
+                id="engine"
+                className="input select-engine"
+                value={engine}
+                onChange={(e) => setEngine(e.target.value as Engine)}
+              >
+                <option value="llm" disabled={!health?.llm_configured}>
+                  LLM with Failover{health?.llm_configured ? "" : " (no provider configured)"}
+                </option>
+                <option value="rules">Rules Engine (no LLM)</option>
+              </select>
+            </div>
+            <button
+              className="btn primary run-resolv-btn"
+              onClick={startRun}
+              disabled={busy || running || !runnable}
+              title={runnable ? "Run the AI teammate on this ticket" : `Ticket is ${t.status}; a human owns it`}
+            >
+              <IconSparkles />
+              <span>{running ? "Resolv Working…" : "Run Resolv →"}</span>
             </button>
           </div>
         </div>
+
         {(error || pending.length > 0) && (
-          <div className="card-b stack">
+          <div className="card-b stack" style={{ borderTop: "1px solid var(--border)" }}>
             <ErrorBanner error={error} />
             {pending.map((h) => (
-              <div key={h.id} className="banner warn">
-                <strong>{h.kind === "approval" ? "Waiting for human approval" : "Escalated to a human"}</strong>
-                {" "}— {h.summary} <a href="#/queue">Open human queue →</a>
+              <div key={h.id} className="paytm-banner warn">
+                <strong>{h.kind === "approval" ? "Waiting for human approval" : "Escalated to human lead"}</strong>
+                {" "}— {h.summary}{" "}
+                <a href="#/queue" className="banner-link">Open human queue →</a>
               </div>
             ))}
           </div>
         )}
       </section>
 
-      <div className="workspace">
+      {/* 3-Column Workspace Grid */}
+      <div className="workspace-columns">
+        {/* Customer Context Panel */}
         <CustomerPanel detail={detail} beforeReversed={beforeReversed} />
 
-        <section className="card" aria-label="Conversation">
-          <div className="card-h"><h2>Conversation</h2><span className="small muted">{detail.messages.length} messages</span></div>
+        {/* Conversation Thread */}
+        <section className="card thread-card" aria-label="Conversation">
+          <div className="card-h">
+            <h2>Customer Thread</h2>
+            <span className="small muted">{detail.messages.length} messages</span>
+          </div>
+
           <div className="thread">
             {detail.messages.map((m) => (
               <div key={m.id} className={`msg ${m.role}`}>
-                <div className="meta">{m.role === "agent" ? `Resolv (${m.author.replace("resolv:", "")})` : m.role === "customer" ? detail.customer.name : m.author} · {when(m.created_at)}</div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
+                <div className="meta">
+                  <span className="author-name">
+                    {m.role === "agent"
+                      ? `Paytm Resolv (${m.author.replace("resolv:", "")})`
+                      : m.role === "customer"
+                      ? detail.customer.name
+                      : m.author}
+                  </span>
+                  <span className="msg-time">· {when(m.created_at)}</span>
+                </div>
+                <div className="msg-body">{m.body}</div>
               </div>
             ))}
           </div>
-          <div className="card-b stack" style={{ borderTop: "1px solid var(--border)" }}>
-            <label className="small muted" htmlFor="composer">Simulate the customer's next message</label>
-            <textarea id="composer" className="input" value={draft} onChange={(e) => setDraft(e.target.value)}
-              placeholder={t.status === "awaiting_customer" ? "e.g. It was the Big Bazaar one, Rs 650" : "Type as the customer"} />
+
+          <div className="card-b stack composer-box">
+            <label className="small muted" htmlFor="composer">Simulate Customer Reply</label>
+            <textarea
+              id="composer"
+              className="input composer-input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={
+                t.status === "awaiting_customer"
+                  ? "e.g. It was the Big Bazaar one, Rs 650"
+                  : "Type a customer reply..."
+              }
+            />
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <span className="small muted">Replies appear in this in-app thread only. No SMS or email is sent.</span>
-              <button className="btn" disabled={busy || !draft.trim()} onClick={sendAsCustomer}>Send as customer</button>
+              <span className="small muted">In-app thread only. No SMS/email sent.</span>
+              <button
+                className="btn primary sm pill-btn"
+                disabled={busy || !draft.trim()}
+                onClick={sendAsCustomer}
+              >
+                Send as Customer <IconArrowRight />
+              </button>
             </div>
           </div>
         </section>
 
-        <section className="card" aria-label="Agent run">
+        {/* Agent Run & Timeline */}
+        <section className="card run-card" aria-label="Agent run">
           <div className="card-h">
-            <h2>Agent run</h2>
+            <h2>Agent Execution</h2>
             <div className="row">
               {detail.runs.length > 1 && (
-                <select className="input" style={{ width: "auto" }} value={runId ?? ""} aria-label="Select run"
-                  onChange={(e) => setRunId(Number(e.target.value))}>
-                  {detail.runs.map((r) => <option key={r.id} value={r.id}>Run #{r.id} · {r.engine} · {r.outcome ?? r.status}</option>)}
+                <select
+                  className="input run-selector"
+                  value={runId ?? ""}
+                  aria-label="Select run"
+                  onChange={(e) => setRunId(Number(e.target.value))}
+                >
+                  {detail.runs.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      Run #{r.id} · {r.engine} · {r.outcome ?? r.status}
+                    </option>
+                  ))}
                 </select>
               )}
             </div>
           </div>
+
           {run ? (
             <>
-              <div className="card-b row small" style={{ borderBottom: "1px solid var(--border)" }}>
-                <span className="mono">#{run.run.id}</span>
+              <div className="card-b row small run-meta-bar">
+                <span className="mono run-id-tag">#{run.run.id}</span>
                 <EngineBadge engine={run.run.engine} model={run.run.model} />
                 <StatusBadge status={run.run.status} />
                 {run.run.outcome && <span>→ <StatusBadge status={run.run.outcome} /></span>}
@@ -271,7 +509,9 @@ function Workspace({ ticketId, health, onChange }: { ticketId: string; health: H
               <Timeline events={run.events} />
             </>
           ) : (
-            <Empty>No run yet. Press <strong>Run Resolv</strong> to let the AI teammate work this ticket.</Empty>
+            <Empty>
+              No runs executed yet. Click <strong>Run Resolv →</strong> to start autonomous policy checks &amp; resolution.
+            </Empty>
           )}
         </section>
       </div>
@@ -279,56 +519,101 @@ function Workspace({ ticketId, health, onChange }: { ticketId: string; health: H
   );
 }
 
-function CustomerPanel({ detail, beforeReversed }: { detail: TicketDetail; beforeReversed: Set<string> }) {
+function CustomerPanel({
+  detail,
+  beforeReversed,
+}: {
+  detail: TicketDetail;
+  beforeReversed: Set<string>;
+}) {
   const c = detail.customer;
   return (
-    <section className="card" aria-label="Customer context">
-      <div className="card-h"><h2>Customer context</h2><Badge>synthetic</Badge></div>
+    <section className="card customer-context-card" aria-label="Customer context">
+      <div className="card-h">
+        <h2>Customer Context</h2>
+        <Badge tone="neutral">synthetic</Badge>
+      </div>
+
       <div className="card-b stack">
-        <dl className="kv">
-          <dt>Name</dt><dd>{c.name} <span className="muted mono">{c.id}</span></dd>
-          <dt>Phone</dt><dd>{c.phone_masked}</dd>
-          <dt>KYC</dt><dd>{c.kyc_level} · {c.tier}</dd>
-        </dl>
-        <h3 style={{ marginTop: 8 }}>Transactions</h3>
-        {detail.transactions.map((t) => {
-          const changed = !!t.reversed && !beforeReversed.has(t.id);
-          return (
-            <div key={t.id} className={`txn ${changed ? "changed" : ""}`}>
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <strong>{rupees(t.amount_paise)}</strong>
-                <span className="small muted">{when(t.created_at)}</span>
-              </div>
-              <div className="small">{t.merchant} · <span className="mono">{t.id}</span></div>
-              <div className="row small">
-                <span className="muted">App:</span><StatusBadge status={t.app_status.toLowerCase()} />
-                <span className="muted">Switch:</span><Badge tone="neutral" title="Sandbox ground truth. The agent learns it only by calling check_switch_status.">{t.switch_status}</Badge>
-                {t.reversed ? <Badge tone="ok">refunded · {t.reversal_ref}</Badge> : null}
-                {changed && <Badge tone="ok">changed in this session</Badge>}
-              </div>
+        {/* Customer Profile Pill */}
+        <div className="customer-info-box">
+          <div className="customer-avatar-badge">{c.name.charAt(0)}</div>
+          <div>
+            <div className="customer-name-row">
+              <strong>{c.name}</strong>
+              <span className="mono small muted">{c.id}</span>
             </div>
-          );
-        })}
-        <h3 style={{ marginTop: 8 }}>Refund ledger <SandboxBadge /></h3>
-        {detail.refunds.length === 0 ? <div className="small muted">No refunds.</div> : (
-          <table className="small">
-            <tbody>
-              {detail.refunds.map((r) => (
-                <tr key={r.id}>
-                  <td className="mono">{r.id}</td>
-                  <td className="num">{rupees(r.amount_paise)}</td>
-                  <td><Badge tone={r.status === "SUCCESS" ? "ok" : "bad"}>{r.status}</Badge></td>
-                  <td className="muted">{r.created_by}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <div className="customer-meta-row">
+              <span>{c.phone_masked}</span> · <span className="kyc-badge">KYC {c.kyc_level}</span> · <span className="tier-tag">{c.tier}</span>
+            </div>
+          </div>
+        </div>
+
+        <h3 className="section-subhead">Recent Transactions</h3>
+        <div className="txns-list">
+          {detail.transactions.map((t) => {
+            const changed = !!t.reversed && !beforeReversed.has(t.id);
+            return (
+              <div key={t.id} className={`txn-card ${changed ? "changed" : ""}`}>
+                <div className="txn-top-row">
+                  <span className="txn-amount">{rupees(t.amount_paise)}</span>
+                  <span className="txn-date">{when(t.created_at)}</span>
+                </div>
+                <div className="txn-merchant-row">
+                  <span className="txn-merchant">{t.merchant}</span>
+                  <span className="mono txn-ref">{t.id}</span>
+                </div>
+                <div className="txn-status-badges">
+                  <div className="status-item">
+                    <span className="status-label">App:</span>
+                    <StatusBadge status={t.app_status.toLowerCase()} />
+                  </div>
+                  <div className="status-item">
+                    <span className="status-label">Switch:</span>
+                    <Badge tone="neutral" title="Sandbox ground truth">{t.switch_status}</Badge>
+                  </div>
+                  {t.reversed ? <Badge tone="ok">refunded · {t.reversal_ref}</Badge> : null}
+                  {changed && <Badge tone="ok">reversed just now</Badge>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <h3 className="section-subhead" style={{ marginTop: 12 }}>
+          Refund Ledger <SandboxBadge />
+        </h3>
+        {detail.refunds.length === 0 ? (
+          <div className="small muted empty-note">No refunds in ledger.</div>
+        ) : (
+          <div className="table-wrap">
+            <table className="small ledger-table">
+              <tbody>
+                {detail.refunds.map((r) => (
+                  <tr key={r.id}>
+                    <td className="mono">{r.id}</td>
+                    <td className="num">{rupees(r.amount_paise)}</td>
+                    <td><Badge tone={r.status === "SUCCESS" ? "ok" : "bad"}>{r.status}</Badge></td>
+                    <td className="muted">{r.created_by}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-        <h3 style={{ marginTop: 8 }}>Prior tickets</h3>
-        {detail.prior_tickets.length === 0 ? <div className="small muted">None.</div> :
+
+        <h3 className="section-subhead" style={{ marginTop: 12 }}>Prior Tickets</h3>
+        {detail.prior_tickets.length === 0 ? (
+          <div className="small muted empty-note">No prior support tickets.</div>
+        ) : (
           detail.prior_tickets.map((p) => (
-            <div key={p.id} className="small row"><span className="mono muted">{p.id}</span>{p.subject}<StatusBadge status={p.status} /></div>
-          ))}
+            <div key={p.id} className="prior-ticket-row">
+              <span className="mono muted">{p.id}</span>
+              <span className="grow">{p.subject}</span>
+              <StatusBadge status={p.status} />
+            </div>
+          ))
+        )}
       </div>
     </section>
   );

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { Badge, EngineBadge } from "./components/ui";
+import {
+  IconCases,
+  IconHome,
+  IconQueue,
+  IconRefresh,
+  IconSystem,
+  RobotMascot,
+} from "./components/PaytmIcons";
 import { Cases } from "./pages/Cases";
 import { Overview } from "./pages/Overview";
 import { Queue } from "./pages/Queue";
@@ -8,7 +16,7 @@ import { System } from "./pages/System";
 import type { Health } from "./types";
 
 function useHashRoute(): string[] {
-  const read = () => (location.hash.replace(/^#\/?/, "") || "cases").split("/");
+  const read = () => (location.hash.replace(/^#\/?/, "") || "overview").split("/");
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const on = () => setRoute(read());
@@ -25,7 +33,29 @@ export default function App() {
   const [pending, setPending] = useState(0);
   const [version, setVersion] = useState(0);
   const [resetting, setResetting] = useState(false);
-  const [resetCount, setResetCount] = useState(0); // remounts pages after a demo reset
+  const [resetCount, setResetCount] = useState(0);
+
+  // Theme & View mode preferences
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    const saved = localStorage.getItem("paytm_theme");
+    if (saved === "light" || saved === "dark") return saved;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "dark"; // Default to sleek dark like Image 1
+  });
+
+  const [deviceFrame, setDeviceFrame] = useState<boolean>(() => {
+    return localStorage.getItem("paytm_device_frame") === "true";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("paytm_theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("paytm_device_frame", String(deviceFrame));
+  }, [deviceFrame]);
+
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
   const refresh = useCallback(() => {
     setVersion((v) => v + 1);
@@ -35,7 +65,6 @@ export default function App() {
   useEffect(() => {
     api.health().then((h) => { setHealth(h); setHealthError(null); }).catch((e) => setHealthError(e.message));
     refresh();
-    // Keep the human-queue count current while runs finish in the background.
     const id = window.setInterval(() => {
       api.handoffs("pending").then((h) => setPending(h.length)).catch(() => undefined);
     }, 5000);
@@ -58,44 +87,175 @@ export default function App() {
   };
 
   const nav = [
-    { id: "overview", label: "Overview" },
-    { id: "cases", label: "Cases" },
-    { id: "queue", label: "Human queue", count: pending },
-    { id: "system", label: "System" },
+    { id: "overview", label: "Overview", icon: IconHome },
+    { id: "cases", label: "Cases", icon: IconCases },
+    { id: "queue", label: "Human queue", icon: IconQueue, count: pending },
+    { id: "system", label: "System", icon: IconSystem },
   ];
 
-  return (
-    <div className="shell">
-      <nav className="nav" aria-label="Main">
-        <div className="brand">
-          <div className="brand-mark" aria-hidden>R</div>
-          <div><strong>Resolv</strong><small>AI support teammate</small></div>
+  const appContent = (
+    <div className={`shell ${deviceFrame ? "in-device" : ""}`}>
+      {/* Desktop Sidebar Navigation */}
+      <nav className="nav desktop-nav" aria-label="Main">
+        <div className="brand resolv-brand-header">
+          <div className="brand-mark-box" aria-hidden>R</div>
+          <div className="brand-titles">
+            <strong className="brand-app-name">Resolv</strong>
+            <small className="brand-app-sub">AI Support Teammate</small>
+          </div>
         </div>
-        {nav.map((n) => (
-          <a key={n.id} href={`#/${n.id}`} className={page === n.id ? "active" : ""} aria-current={page === n.id ? "page" : undefined}>
-            {n.label}
-            {n.count ? <span className="count">{n.count}</span> : null}
-          </a>
-        ))}
+
+        {/* AI Assistant Mascot mini badge */}
+        <div className="assistant-card">
+          <div className="assistant-avatar-wrap">
+            <RobotMascot size={36} />
+            <span className="live-dot" title="Resolv AI Teammate Active" />
+          </div>
+          <div className="assistant-info">
+            <span className="assistant-name">Resolv AI</span>
+            <span className="assistant-role">UPI Support Teammate</span>
+          </div>
+        </div>
+
+        <div className="nav-group">
+          {nav.map((n) => {
+            const Icon = n.icon;
+            const active = page === n.id;
+            return (
+              <a
+                key={n.id}
+                href={`#/${n.id}`}
+                className={`nav-link ${active ? "active" : ""}`}
+                aria-current={active ? "page" : undefined}
+              >
+                <span className="nav-icon"><Icon /></span>
+                <span className="nav-label">{n.label}</span>
+                {n.count ? <span className="count-pill">{n.count}</span> : null}
+              </a>
+            );
+          })}
+        </div>
+
         <div className="nav-foot">
-          <span>Prototype. Synthetic data. Payment rails are sandboxed.</span>
+          <div className="paytm-pill-tag">
+            <span className="dot ok-dot" />
+            <span>Sandbox Rails Active</span>
+          </div>
+          <span className="disclaimer">Paytm Hackathon 2026 · Track 3</span>
         </div>
       </nav>
+
+      {/* Main Content Area */}
       <div className="main">
         <header className="topbar">
-          {health ? <EngineBadge engine={health.engine} model={health.model} /> : null}
-          <Badge tone="warn" title="Customers, transactions and tickets are generated demo data">synthetic data</Badge>
-          {healthError && <Badge tone="bad">backend unreachable: {healthError}</Badge>}
+          <div className="mobile-brand-bar">
+            <span className="brand-mark-box sm" aria-hidden>R</span>
+            <strong className="brand-app-name">Resolv</strong>
+          </div>
+
+          <div className="topbar-status-group">
+            {health ? <EngineBadge engine={health.engine} model={health.model} /> : null}
+            <Badge tone="warn" title="Customers, transactions and tickets are generated demo data">
+              synthetic data
+            </Badge>
+            {healthError && <Badge tone="bad">backend unreachable: {healthError}</Badge>}
+          </div>
+
           <span className="spacer" />
-          <button className="btn sm" onClick={reset} disabled={resetting}>{resetting ? "Resetting…" : "Reset demo"}</button>
+
+          <div className="topbar-actions">
+            {/* View mode toggle */}
+            <button
+              className="view-toggle-btn"
+              onClick={() => setDeviceFrame((df) => !df)}
+              title={deviceFrame ? "Switch to Full Desktop view" : "Switch to Mobile Phone Prototype view"}
+              aria-label="Toggle device frame preview"
+            >
+              {deviceFrame ? "💻 Full View" : "📱 Phone View"}
+            </button>
+
+            {/* Theme toggle */}
+            <button
+              className="theme-toggle-btn"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === "dark" ? "Light (Paytm App)" : "Dark (StudyGenie/Dark)"} theme`}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? "☀️ Light" : "🌙 Dark"}
+            </button>
+
+            {/* Reset button */}
+            <button
+              className="btn sm reset-btn"
+              onClick={reset}
+              disabled={resetting}
+              title="Reset all demo data"
+            >
+              <IconRefresh className={resetting ? "spinning" : ""} />
+              <span>{resetting ? "Resetting…" : "Reset"}</span>
+            </button>
+          </div>
         </header>
-        <main key={resetCount}>
+
+        <main className="content-scroll" key={resetCount}>
           {page === "overview" && <Overview version={version} />}
           {page === "cases" && <Cases ticketId={param ?? null} health={health} onChange={refresh} />}
           {page === "queue" && <Queue onChange={refresh} />}
           {page === "system" && <System onChange={refresh} />}
         </main>
+
+        {/* Mobile / Prototype Bottom Navigation Bar */}
+        <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
+          {nav.map((n) => {
+            const Icon = n.icon;
+            const active = page === n.id;
+            return (
+              <a
+                key={n.id}
+                href={`#/${n.id}`}
+                className={`mobile-nav-item ${active ? "active" : ""}`}
+                aria-current={active ? "page" : undefined}
+              >
+                <div className="mobile-icon-wrap">
+                  <Icon />
+                  {n.count ? <span className="mobile-count-badge">{n.count}</span> : null}
+                </div>
+                <span className="mobile-nav-label">{n.label}</span>
+              </a>
+            );
+          })}
+        </nav>
       </div>
     </div>
   );
+
+  if (deviceFrame) {
+    return (
+      <div className="device-preview-wrapper">
+        <div className="device-controls-bar">
+          <div className="preview-label">
+            <strong>Paytm Resolv</strong> · Mobile Prototype View
+          </div>
+          <button className="btn sm primary" onClick={() => setDeviceFrame(false)}>
+            Exit Phone View (Expand Full Screen)
+          </button>
+        </div>
+        <div className="phone-mockup">
+          <div className="phone-screen-header">
+            <span className="phone-time">8:30</span>
+            <div className="phone-island" />
+            <div className="phone-icons">
+              <span className="network-bars">●●●●</span>
+              <span className="battery-icon">99%</span>
+            </div>
+          </div>
+          <div className="phone-inner-content">
+            {appContent}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return appContent;
 }

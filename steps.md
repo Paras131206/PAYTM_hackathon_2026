@@ -351,3 +351,13 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
 - [!] `google-genai` SDK not installed: PyPI timed out from this network, so a REST adapter is used instead (see requirements.md).
 - [ ] "Real data": real UPI transaction data is not obtainable (it is private to banks and NPCI). The proposed alternative is to calibrate the synthetic scenario mix to published NPCI/RBI statistics. This is waiting on the user's decision.
 - [ ] Planned, not built: ₹100/day compensation workflow, authentication, deployment, multilingual replies.
+- [x] **UI Theme & Layout Redesign (2026-10-24):**
+  - Integrated official Paytm branding (`#00BAF2` Paytm Cyan, `#002970` Paytm Navy, "paytm ♥️ UPI" lockup).
+  - Adopted modern AI assistant layout inspired by StudyGenie: vector AI mascot, circular progress gauges on performance metrics, and filter pills (`All`, `Actionable`, `Awaiting`, `Approval`, `Resolved`).
+  - Added dedicated Mobile Phone Prototype preview mode (interactive iPhone mockup frame with dynamic island and bottom navigation) alongside the responsive full-screen dashboard.
+  - Added ☀️ Light (Paytm web style) / 🌙 Dark (assistant dark style) theme toggle in the top bar.
+  - Added dropdown and collapsible view options for Performance Outcomes (Summary 4 gauges, Detailed 10 metrics, Operations only, or Collapsed) to prevent page clutter.
+  - Removed Paytm logo from top left brand header, replacing it with a clean Resolv mark and title.
+  - Fixed ticket prefix typo (`TCK-` to `TKT-`) across scenario cards and added auto-normalization in the Cases view.
+  - `npm run build` and backend pytest suite (95 tests) verified passing.
+
