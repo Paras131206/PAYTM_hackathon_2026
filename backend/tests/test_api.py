@@ -100,3 +100,19 @@ def test_fault_toggle_and_metrics_and_reset(client):
     assert "SYNTHETIC" in m["label"]
     assert client.post("/api/demo/reset").json()["status"] == "reset"
     assert client.get("/api/metrics").json()["cases_processed"] == 0
+
+
+def test_follow_up_message_uses_requested_engine(client, monkeypatch):
+    monkeypatch.setattr(settings, "resolved_engine", "llm")   # server default would be the LLM chain
+    client.post("/api/tickets/TKT-1004/runs", json={"engine": "rules"})
+    r = client.post("/api/tickets/TKT-1004/messages", json={"body": "The Zomato one, Rs 300", "engine": "rules"})
+    run = client.get(f"/api/runs/{r.json()['run_id']}").json()["run"]
+    assert run["engine"] == "rules" and run["outcome"] == "resolved"
+
+
+def test_message_is_not_stored_when_the_run_cannot_start(client, monkeypatch):
+    monkeypatch.setattr(settings, "llm_providers", [])
+    before = len(client.get("/api/tickets/TKT-1001").json()["messages"])
+    r = client.post("/api/tickets/TKT-1001/messages", json={"body": "hello?", "engine": "llm"})
+    assert r.status_code == 400
+    assert len(client.get("/api/tickets/TKT-1001").json()["messages"]) == before   # a retry won't duplicate it

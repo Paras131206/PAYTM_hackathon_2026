@@ -41,6 +41,7 @@ class RunRequest(_Body):
 class MessageRequest(_Body):
     body: str = Field(min_length=1, max_length=2000)
     auto_run: bool = True
+    engine: Literal["llm", "rules"] | None = None   # the engine for the follow-up run; default = server engine
 
 
 class NewTicketRequest(_Body):
@@ -187,14 +188,14 @@ def post_message(ticket_id: str, req: MessageRequest, tasks: BackgroundTasks) ->
         ticket = ctxsvc.get_ticket(ticket_id)
     except ctxsvc.NotFound as e:
         raise HTTPException(404, str(e)) from e
+    will_run = req.auto_run and ticket["status"] in orchestrator.AGENT_RUNNABLE_TICKET_STATUSES
+    engine = _engine_or_400(req.engine) if will_run else None   # fail before storing, so a retry can't duplicate
     with db.tx() as c:
         c.execute("INSERT INTO messages (ticket_id, role, author, body, created_at) VALUES (?,?,?,?,?)",
                   (ticket_id, "customer", ticket["customer_id"], req.body, iso(utcnow())))
         if ticket["status"] == "awaiting_customer":
             c.execute("UPDATE tickets SET status = 'open', updated_at = ? WHERE id = ?", (iso(utcnow()), ticket_id))
-    run_id = None
-    if req.auto_run and ticket["status"] in orchestrator.AGENT_RUNNABLE_TICKET_STATUSES:
-        run_id = _start_run(ticket_id, _engine_or_400(None), tasks)
+    run_id = _start_run(ticket_id, engine, tasks) if engine else None
     return {"ticket_id": ticket_id, "run_id": run_id,
             "note": None if run_id else f"Ticket is {ticket['status']}; message stored for the human owner."}
 

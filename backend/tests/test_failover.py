@@ -159,3 +159,82 @@ def test_groq_tool_call_glitch_is_retried_not_fatal():
     groq = compat("groq", [glitch, oa_text("Nothing to do.")], seen)
     rid, _ = run(LLMPlanner([groq]))
     assert len(seen) == 2 and not events(rid, "error")
+
+
+# ---------------------------------------------------------------- regressions from the second code review
+def test_per_day_quota_fails_fast_even_with_short_retry_delay(monkeypatch):
+    slept = []
+    monkeypatch.setattr("app.agent.llm.time.sleep", slept.append)
+    body = {"error": {"code": 429, "message": "quota", "details": [
+        {"@type": "type.googleapis.com/google.rpc.QuotaFailure", "violations": [
+            {"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]},
+        {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "22s"}]}}
+    seen = []
+    g = gemini([(429, body)], seen)
+    rid, _ = run(LLMPlanner([g]))
+    assert slept == [] and len(seen) == 1 and events(rid, "error")[0]["code"] == "rate_limited"
+
+
+def test_malformed_reply_fails_over_and_keeps_the_audit_trail(monkeypatch):
+    monkeypatch.setattr("app.agent.llm.time.sleep", lambda _s: None)
+    seen = []
+    g = gemini([(429, DAILY_QUOTA)], seen)
+
+    def html(_req):
+        seen.append(("groq", None))
+        return httpx.Response(200, text="<html>Bad gateway</html>")
+    groq = OpenAICompatProvider(OpenAICompatClient(name="groq", base_url="https://x.test/v1", model="groq-m",
+                                                   http=httpx.Client(transport=httpx.MockTransport(html))))
+    ollama = compat("ollama", [oa_text("nothing to do")], seen)
+    rid, _ = run(LLMPlanner([g, groq, ollama]))
+    hops = [(f["to"].split(":")[0], f["code"]) for f in events(rid, "llm_failover")]
+    assert hops == [("groq", "rate_limited"), ("ollama", "bad_response")]
+    assert db.query_one("SELECT model FROM runs WHERE id = ?", (rid,))["model"] == "ollama:ollama-m"
+
+
+def test_run_model_says_none_answered_when_every_provider_failed(monkeypatch):
+    monkeypatch.setattr("app.agent.llm.time.sleep", lambda _s: None)
+    seen = []
+    rid, _ = run(LLMPlanner([gemini([(429, DAILY_QUOTA)], seen)]))
+    assert db.query_one("SELECT model FROM runs WHERE id = ?", (rid,))["model"] == "none answered"
+
+
+def test_generated_tool_call_ids_are_unique_across_turns():
+    seen = []
+    no_id = (200, {"choices": [{"finish_reason": "tool_calls", "message": {"role": "assistant", "tool_calls": [
+        {"type": "function", "function": {"name": "get_policy", "arguments": '{"policy_id": "POL-PENDING"}'}}]}}]})
+    ollama = compat("ollama", [no_id, no_id, oa_text("done")], seen)
+    run(LLMPlanner([ollama]))
+    ids = [m["tool_call_id"] for m in seen[-1][1]["messages"] if m["role"] == "tool"]
+    assert len(ids) == 2 and len(set(ids)) == 2
+
+
+def test_foreign_turns_sent_to_gemini_carry_the_placeholder_signature():
+    from app.agent.providers import ToolCall, Turn
+    seen = []
+    g = gemini([(200, {"candidates": [{"finishReason": "STOP", "content": {"role": "model", "parts": [
+        {"text": "ok"}]}}]})], seen)
+    groq_turn = Turn("groq", "m", "", [ToolCall("call_1", "get_policy", {"policy_id": "POL-PENDING"})])
+    g.complete("sys", [("user", "hi"), ("assistant", groq_turn), ("results", [])])
+    part = seen[0][1]["contents"][1]["parts"][0]
+    assert part["thoughtSignature"] == "skip_thought_signature_validator" and part["functionCall"]["id"] == "call_1"
+
+
+def test_groq_tool_use_failed_code_is_retried():
+    seen = []
+    glitch = (400, {"error": {"message": "Failed to call a function. Please adjust your prompt.",
+                              "code": "tool_use_failed"}})
+    rid, _ = run(LLMPlanner([compat("groq", [glitch, oa_text("ok")], seen)]))
+    assert len(seen) == 2 and not events(rid, "error")
+
+
+def test_auto_engine_follows_llm_providers(monkeypatch):
+    from app.config import Settings
+    for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "OLLAMA_MODEL"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_x")
+    monkeypatch.setenv("AGENT_ENGINE", "auto")
+    monkeypatch.setenv("LLM_PROVIDERS", "gemini")
+    assert Settings().resolved_engine == "rules"          # groq has a key but isn't in the chain
+    monkeypatch.setenv("LLM_PROVIDERS", "gemini,groq")
+    assert Settings().resolved_engine == "llm"

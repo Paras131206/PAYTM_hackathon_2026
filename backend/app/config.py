@@ -19,8 +19,11 @@ def gemini_api_key() -> str:
     return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
 
 
-def _llm_keys_present() -> bool:
-    return any(os.getenv(k) for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GROQ_API_KEY", "OLLAMA_MODEL"))
+PROVIDER_ENV = {"gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"), "groq": ("GROQ_API_KEY",), "ollama": ("OLLAMA_MODEL",)}
+
+
+def provider_env_present(name: str) -> bool:
+    return any(os.getenv(k) for k in PROVIDER_ENV.get(name, ()))
 
 
 @dataclass
@@ -56,7 +59,7 @@ class Settings:
         if unknown:
             raise ValueError(f"LLM_PROVIDERS has unknown providers: {sorted(unknown)}")
         if self.agent_engine == "auto":
-            self.resolved_engine = "llm" if _llm_keys_present() else "rules"
+            self.resolved_engine = "llm" if any(provider_env_present(p) for p in self.llm_providers) else "rules"
         else:
             self.resolved_engine = self.agent_engine
 

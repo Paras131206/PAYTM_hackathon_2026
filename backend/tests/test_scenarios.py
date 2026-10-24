@@ -209,8 +209,23 @@ def test_earlier_injection_still_flags_later_runs():
     assert db.query("SELECT * FROM refunds") == []
 
 
-def test_stale_runs_are_failed_at_startup():
+def test_stale_runs_are_failed_and_handed_to_a_human_at_startup():
     rid = orch.create_run("TKT-1001", "rules")
     assert orch.fail_stale_runs() == 1
     assert db.query_one("SELECT status FROM runs WHERE id = ?", (rid,))["status"] == "failed"
-    orch.create_run("TKT-1001", "rules")  # ticket no longer blocked
+    assert status("TKT-1001") == "escalated"
+    assert db.query_one("SELECT reason_code FROM handoffs WHERE ticket_id = 'TKT-1001'")["reason_code"] == "other"
+
+
+def test_stale_run_that_resolved_silently_is_flagged_customer_not_notified():
+    from app.tools.registry import RunContext, execute
+    rid = orch.create_run("TKT-1001", "rules")
+    ctx = RunContext(rid, "TKT-1001", "CUST-001", "agent", "rules", assessed=True)
+    execute(ctx, "check_switch_status", {"txn_id": "UPI4021000101"})
+    ref = execute(ctx, "issue_refund", {"txn_id": "UPI4021000101", "reason": "failed_debit"}).data["refund_id"]
+    execute(ctx, "verify_refund", {"refund_id": ref})
+    execute(ctx, "update_ticket", {"ticket_id": "TKT-1001", "status": "resolved", "note": "x"})
+    # ...the process dies here, before the reply
+    orch.fail_stale_runs()
+    h = db.query_one("SELECT reason_code FROM handoffs WHERE ticket_id = 'TKT-1001'")
+    assert h["reason_code"] == "customer_not_notified" and status("TKT-1001") == "escalated"

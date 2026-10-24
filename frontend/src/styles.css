@@ -83,6 +83,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 .topbar { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--border);
   background: var(--surface); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
 .topbar .spacer { flex: 1; }
+.topbar .badge { white-space: normal; overflow-wrap: anywhere; }  /* the LLM chain label can be long */
 .page { padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 16px; }
 
 /* ---------- primitives ---------- */
@@ -150,6 +151,7 @@ tr:last-child td { border-bottom: none; }
 
 /* ---------- cases ---------- */
 .cases { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+.cases > *, .workspace > * { min-width: 0; }  /* let grid columns shrink below their content's width */
 .ticket-list { max-height: calc(100vh - 150px); overflow: auto; }
 .ticket-item { display: block; padding: 10px 12px; border-bottom: 1px solid var(--border); text-decoration: none;
   color: inherit; }

@@ -82,7 +82,7 @@ def case_prompt(context: dict[str, Any], suspicious_hint: bool) -> str:
 # Errors that mean "this provider is unavailable right now", where trying the next provider is safe. A refusal or a
 # malformed answer is not on the list: switching models to get past a refusal would defeat the point of it.
 FAILOVER_CODES = {"rate_limited", "timeout", "connection_error", "api_error", "model_not_found", "auth_failed",
-                  "missing_credentials"}
+                  "missing_credentials", "bad_response"}
 
 
 class LLMPlanner:

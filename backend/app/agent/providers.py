@@ -52,7 +52,10 @@ class GeminiProvider:
             elif kind == "assistant":
                 contents.append(item.raw if item.provider == self.name else {"role": "model", "parts": (
                     ([{"text": item.text}] if item.text else [])
-                    + [{"functionCall": {"id": c.id, "name": c.name, "args": c.args}} for c in item.calls])})
+                    # Gemini 3 rejects function calls without a thought signature (verified live: HTTP 400). Calls
+                    # written by another provider have none, so they carry Google's documented placeholder.
+                    + [{"functionCall": {"id": c.id, "name": c.name, "args": c.args},
+                        "thoughtSignature": "skip_thought_signature_validator"} for c in item.calls])})
             else:
                 contents.append({"role": "user", "parts": [
                     {"functionResponse": {**({} if call.id.startswith("gemini-") else {"id": call.id}),
@@ -65,7 +68,8 @@ class GeminiProvider:
             fc = p.get("functionCall")
             if fc:
                 self._n += 1
-                calls.append(ToolCall(fc.get("id") or f"gemini-{self._n}", fc["name"], dict(fc.get("args") or {})))
+                calls.append(ToolCall(fc.get("id") or f"gemini-{self._n}", fc.get("name") or "",
+                                      dict(fc.get("args") or {})))
         text = " ".join(p["text"] for p in parts if p.get("text") and not p.get("thought")).strip()
         return Turn(self.name, self.model, text, calls, content)
 
@@ -74,6 +78,7 @@ class OpenAICompatProvider:
     def __init__(self, client: OpenAICompatClient):
         self.client = client
         self.name, self.model = client.name, client.model
+        self._n = 0
 
     def complete(self, system: str, history: list) -> Turn:
         messages: list[dict] = [{"role": "system", "content": system}]
@@ -92,14 +97,15 @@ class OpenAICompatProvider:
                              for call, res in item]
         message = self.client.create(messages=messages, tools=openai_tool_definitions())
         calls = []
-        for i, tc in enumerate(message.get("tool_calls") or []):
+        for tc in message.get("tool_calls") or []:
+            self._n += 1
             fn = tc.get("function") or {}
             raw_args = fn.get("arguments") or "{}"
             try:
                 args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
             except json.JSONDecodeError:
                 args = {"_unparseable_arguments": raw_args}  # rejected by validation as invalid_args
-            calls.append(ToolCall(tc.get("id") or f"{self.name}-{i}", fn.get("name", ""), args))
+            calls.append(ToolCall(tc.get("id") or f"{self.name}-{self._n}", fn.get("name", ""), args))
         return Turn(self.name, self.model, (message.get("content") or "").strip(), calls, message)
 
 

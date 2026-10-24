@@ -36,7 +36,7 @@ def create_run(ticket_id: str, engine: str) -> int:
     ticket = ctxsvc.get_ticket(ticket_id)
     if ticket["status"] not in AGENT_RUNNABLE_TICKET_STATUSES:
         raise RunConflict(f"Ticket is {ticket['status']}; a human owns it now.")
-    model = chain_label() if engine == "llm" else None
+    model = None  # filled in with the models that actually answer
     with db.tx() as c:
         active = c.execute(
             "SELECT id FROM runs WHERE ticket_id = ? AND status IN ('queued','running')", (ticket_id,)
@@ -88,7 +88,7 @@ def execute_run(run_id: int, planner_factory: Callable[[str], Any] | None = None
             "messages": len(context["conversation"]),
             "refunds_last_30_days": context["refunds_last_30_days"],
             "engine": run["engine"],
-            "model": run["model"],
+            "planned_chain": chain_label() if run["engine"] == "llm" else None,
         })
 
         planner = (planner_factory or make_planner)(run["engine"])
@@ -135,15 +135,24 @@ def _fail(ctx: RunContext, turns: int, source: str, code: str, message: str, rea
         outcome = OUTCOME_BY_STATUS.get(status, outcome)
     finally:
         _finish(ctx.run_id, "failed", outcome, turns, f"{code}: {message}")
+        with db.tx() as c:  # say so plainly when no model answered at all
+            c.execute("UPDATE runs SET model = COALESCE(model, 'none answered') WHERE id = ? AND engine = 'llm'",
+                      (ctx.run_id,))
     return outcome
 
 
 def fail_stale_runs() -> int:
-    """Runs left queued/running by a crash or restart would block their ticket forever; close them at startup."""
-    with db.tx() as c:
-        cur = c.execute("UPDATE runs SET status = 'failed', outcome = 'failed', error = 'interrupted by restart',"
-                        " finished_at = ? WHERE status IN ('queued', 'running')", (iso(utcnow()),))
-        return cur.rowcount
+    """Runs left queued/running by a crash or restart would block their ticket forever. Close each one the same way
+    a failed run is closed, so its ticket ends up with a human (assumes one backend process, as documented)."""
+    stale = db.query("SELECT r.id, r.ticket_id, r.engine, r.turns, t.customer_id FROM runs r"
+                     " JOIN tickets t ON t.id = r.ticket_id WHERE r.status IN ('queued', 'running')")
+    for r in stale:
+        seq = db.query_one("SELECT COALESCE(MAX(seq), 0) AS s FROM events WHERE run_id = ?", (r["id"],))["s"]
+        ctx = RunContext(run_id=r["id"], ticket_id=r["ticket_id"], customer_id=r["customer_id"], actor="agent",
+                         engine=r["engine"], seq=seq)
+        _fail(ctx, r["turns"], "orchestrator", "interrupted", "The backend restarted while this run was in progress.",
+              "other")
+    return len(stale)
 
 
 def _system_escalate(ctx: RunContext, reason: str, summary: str) -> None:

@@ -165,7 +165,7 @@ function Workspace({ ticketId, health, onChange }: { ticketId: string; health: H
     setBusy(true);
     setError(null);
     try {
-      const r = await api.sendMessage(ticketId, draft);
+      const r = await api.sendMessage(ticketId, draft, engine);
       setDraft("");
       await loadDetail();
       if (r.run_id) setRunId(r.run_id);

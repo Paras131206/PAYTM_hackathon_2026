@@ -32,7 +32,7 @@ export function StatusBadge({ status }: { status: string | null | undefined }) {
 }
 
 export function EngineBadge({ engine, model }: { engine: string; model?: string | null }) {
-  if (engine === "llm") return <Badge tone="accent" title="LLM planner. Providers are tried in order; a quota or outage moves to the next one.">LLM · {model ?? "no provider"}</Badge>;
+  if (engine === "llm") return <Badge tone="accent" title="LLM planner. Providers are tried in order; a quota or outage moves to the next one.">LLM · {model ?? "waiting for first answer"}</Badge>;
   if (engine === "human") return <Badge tone="ok">Human · {model}</Badge>;
   return <Badge tone="neutral" title="Deterministic keyword planner. No LLM is called.">Rules engine (no LLM)</Badge>;
 }

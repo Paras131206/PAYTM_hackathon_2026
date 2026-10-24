@@ -7,6 +7,7 @@ export function Queue({ onChange }: { onChange: () => void }) {
   const [items, setItems] = useState<Handoff[] | null>(null);
   const [filter, setFilter] = useState<"pending" | "all">("pending");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api.handoffs(filter === "pending" ? "pending" : undefined).then(setItems).catch((e) => setError(e.message));
@@ -28,7 +29,8 @@ export function Queue({ onChange }: { onChange: () => void }) {
       <ErrorBanner error={error} />
       {!items && <Empty><span className="spinner" /></Empty>}
       {items?.length === 0 && <div className="card"><Empty>Nothing waiting for a human. Run the demo scenarios from the Cases page.</Empty></div>}
-      {items?.map((h) => <HandoffCard key={h.id} h={h} onDone={() => { load(); onChange(); }} />)}
+      {notice && <div className="banner" role="status">{notice}</div>}
+      {items?.map((h) => <HandoffCard key={h.id} h={h} onDone={(msg) => { setNotice(msg); load(); onChange(); }} />)}
     </div>
   );
 }
@@ -46,7 +48,14 @@ const WHY: Record<string, string> = {
   customer_not_notified: "The refund is done and verified, but the agent stopped before telling the customer. Send them the outcome (use the note box) and mark handled.",
 };
 
-function HandoffCard({ h, onDone }: { h: Handoff; onDone: () => void }) {
+const OUTCOME_TEXT: Record<string, string> = {
+  resolved: "refund executed, verified in the ledger, ticket resolved and customer notified",
+  escalated: "the action could not be completed, so the ticket was escalated again",
+  closed: "ticket closed and the customer notified",
+  awaiting_customer: "question sent to the customer",
+};
+
+function HandoffCard({ h, onDone }: { h: Handoff; onDone: (message: string) => void }) {
   const [reviewer, setReviewer] = useState("Support lead");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,7 +70,9 @@ function HandoffCard({ h, onDone }: { h: Handoff; onDone: () => void }) {
     try {
       const r = await api.decide(h.id, decision, reviewer, note);
       setResult(r);
-      onDone();
+      const outcome = String(r.outcome ?? "");
+      onDone(`${h.ticket_id}: ${decision.replace("_", " ")} → ${OUTCOME_TEXT[outcome] ?? outcome}.`
+        + (r.error ? ` ${String(r.error)}` : ""));
     } catch (e: any) {
       setError(e.message);
     } finally {

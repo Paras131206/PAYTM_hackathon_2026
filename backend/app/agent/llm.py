@@ -53,7 +53,7 @@ class GeminiClient:
                 raise LLMError("connection_error", f"Could not reach the Gemini API: {e}") from e
             if (r.status_code == 429 or r.status_code >= 500) and attempt < attempts - 1:
                 delay = _retry_delay(r)
-                if delay and delay > 60:  # e.g. a daily quota: waiting inside a run cannot help
+                if (delay and delay > 60) or _per_day_quota(r):  # a daily quota: waiting inside a run cannot help
                     break
                 time.sleep(delay or 2.0 * 2 ** attempt)
                 continue
@@ -65,7 +65,7 @@ class GeminiClient:
             if r.status_code == 400 and "API key" in detail:
                 code = "auth_failed"
             raise LLMError(code, f"Gemini API error {r.status_code}: {detail}")
-        data = r.json()
+        data = _json_object(r, "Gemini")
         candidates = data.get("candidates") or []
         if not candidates:
             reason = (data.get("promptFeedback") or {}).get("blockReason", "no candidates")
@@ -78,6 +78,27 @@ class GeminiClient:
         if finish != "STOP":
             raise LLMError("unexpected_stop", f"Gemini stopped with {finish}; treating the run as failed.")
         return candidates[0]
+
+
+def _json_object(r: httpx.Response, provider: str) -> dict:
+    """A 200 that isn't a JSON object (HTML error page, truncated body) is a provider fault, not our bug."""
+    try:
+        data = r.json()
+    except ValueError as e:
+        raise LLMError("bad_response", f"{provider} returned a response that is not JSON.") from e
+    if not isinstance(data, dict):
+        raise LLMError("bad_response", f"{provider} returned an unexpected response shape.")
+    return data
+
+
+def _per_day_quota(r: httpx.Response) -> bool:
+    """google.rpc.QuotaFailure naming a per-day quota (e.g. GenerateRequestsPerDayPerProjectPerModel-FreeTier)."""
+    try:
+        return any("PerDay" in str(v.get("quotaId", ""))
+                   for d in r.json()["error"].get("details", []) if str(d.get("@type", "")).endswith("QuotaFailure")
+                   for v in d.get("violations", []))
+    except Exception:
+        return False
 
 
 def _retry_delay(r: httpx.Response) -> float | None:
@@ -132,7 +153,9 @@ class OpenAICompatClient:
             code = {400: "bad_request", 401: "auth_failed", 403: "auth_failed", 404: "model_not_found",
                     429: "rate_limited"}.get(r.status_code, "api_error")
             raise LLMError(code, f"{self.name} API error {r.status_code}: {_openai_error_message(r)}")
-        choice = (r.json().get("choices") or [{}])[0]
+        choice = (_json_object(r, self.name).get("choices") or [{}])[0]
+        if not isinstance(choice, dict):
+            raise LLMError("bad_response", f"{self.name} returned an unexpected response shape.")
         finish = choice.get("finish_reason")
         if finish == "length":
             raise LLMError("truncated", f"The {self.name} response hit its token limit.")
@@ -145,7 +168,14 @@ class OpenAICompatClient:
 
 def _tool_call_glitch(r: httpx.Response) -> bool:
     """Groq rejects a sample whose tool call is malformed or names an unknown tool (seen live with gpt-oss)."""
-    return r.status_code == 400 and "tool call validation failed" in _openai_error_message(r).lower()
+    if r.status_code != 400:
+        return False
+    try:
+        if r.json()["error"].get("code") == "tool_use_failed":  # Groq's code for a malformed tool call
+            return True
+    except Exception:
+        pass
+    return "tool call validation failed" in _openai_error_message(r).lower()
 
 
 def _retry_after(r: httpx.Response) -> float | None:

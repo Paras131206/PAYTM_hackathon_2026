@@ -94,7 +94,7 @@ export function System({ onChange }: { onChange: () => void }) {
             <button className="btn" onClick={() => fault(mode)}>Inject fault</button>
           </div>
           {s.faults.length === 0 ? <div className="small muted">No faults active.</div> : (
-            <table className="small">
+            <div className="table-wrap"><table className="small">
               <thead><tr><th>Adapter</th><th>Target</th><th>Mode</th><th /></tr></thead>
               <tbody>
                 {s.faults.map((f) => (
@@ -104,7 +104,7 @@ export function System({ onChange }: { onChange: () => void }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
           <div className="small muted">Use <code>*</code> to fail every switch call. The seeded fault on UPI4021000501 drives scenario S5.</div>
         </div>

@@ -44,8 +44,8 @@ export const api = {
   run: (id: number) => request<RunDetail>(`/api/runs/${id}`),
   startRun: (ticketId: string, engine?: Engine) =>
     post<{ run_id: number; engine: string }>(`/api/tickets/${encodeURIComponent(ticketId)}/runs`, engine ? { engine } : {}),
-  sendMessage: (ticketId: string, body: string) =>
-    post<{ run_id: number | null; note: string | null }>(`/api/tickets/${encodeURIComponent(ticketId)}/messages`, { body }),
+  sendMessage: (ticketId: string, body: string, engine?: Engine) =>
+    post<{ run_id: number | null; note: string | null }>(`/api/tickets/${encodeURIComponent(ticketId)}/messages`, { body, engine }),
   createTicket: (customer_id: string, subject: string, body: string) =>
     post<{ ticket_id: string; run_id: number | null }>("/api/tickets", { customer_id, subject, body }),
   handoffs: (status?: string) => request<Handoff[]>(`/api/handoffs${status ? `?status=${status}` : ""}`),

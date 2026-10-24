@@ -67,8 +67,8 @@ Write tools must be idempotent, or keyed so that retries are visible and counted
 ## 6. LLM configuration rules
 
 - Providers: Gemini (REST) and Groq / Ollama (OpenAI-compatible `chat/completions`), free tiers or local only. Do not add paid providers without the team's approval. Clients live in `agent/llm.py`, rendering in `agent/providers.py`. Engines are `llm` (the `LLM_PROVIDERS` chain) and `rules`.
-- Failover: forward only, and only on availability codes (`FAILOVER_CODES` in `planners.py`). Never on `refusal`, `truncated`, `bad_request` or `unexpected_stop`. Every switch is emitted as an `llm_failover` event, and `runs.model` lists the models that answered. Never fail over to the rules engine.
-- A provider replays its own earlier turns verbatim (`Turn.raw`). Other providers' turns are rendered from the neutral history.
+- Failover: forward only, and only on availability codes (`FAILOVER_CODES` in `planners.py`, including `bad_response` for a malformed provider reply). Never on `refusal`, `truncated`, `bad_request` or `unexpected_stop`. Every switch is emitted as an `llm_failover` event, and `runs.model` lists the models that answered. Never fail over to the rules engine.
+- A provider replays its own earlier turns verbatim (`Turn.raw`). Other providers' turns are rendered from the neutral history; when rendered for Gemini they carry `thoughtSignature: skip_thought_signature_validator` (Gemini 3 rejects unsigned function calls, verified live).
 - Do not loosen tool schemas to accommodate weak models. Validation is a trust boundary.
 - Gemini: send the key in the `x-goog-api-key` header (never in the URL). Replay the model's `content` verbatim (it carries thought signatures). Return every `functionResponse` in one user turn. Don't send `additionalProperties` in function schemas. Any `finishReason` other than STOP is an `LLMError`.
 - Customer text goes inside `<untrusted_customer_content>`. The system prompt states that it is data. Permissions are enforced in code regardless of what the model does.

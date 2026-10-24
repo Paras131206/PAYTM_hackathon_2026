@@ -271,6 +271,7 @@ No "human minutes saved" figure is reported, because no measured baseline exists
 | 2026-10-24 | `pytest` after removing Claude and Cerebras | **80 passed** |
 | 2026-10-24 | `pytest` after the refund-ETA and Groq-retry fixes | **81 passed** |
 | 2026-10-24 | `pytest` after the customer-not-notified fix | **84 passed** |
+| 2026-10-24 | `pytest` after the second review and click-through fixes | **94 passed** |
 | 2026-10-24 | `cd frontend && npm run build` | tsc + vite build OK |
 | 2026-10-24 | Documented reset commands (`python -m app.seed`, `POST /api/demo/reset`) | OK |
 
@@ -291,6 +292,30 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
   - The 3B model left out the required `injection_suspected` field on every `record_assessment` call. Validation rejected it each time, so the agent could not act and the ticket was escalated with no refund. That is safe, but too weak to be useful: Ollama needs a 7B+ model.
 
 - [x] **Paid providers removed (2026-10-24, at the team's request):** Anthropic/Claude and Cerebras. Their code, tests, settings and the `anthropic` dependency are gone. The supported chain is now Gemini → Groq → Ollama (all free or local). 80 tests pass with the `anthropic` package uninstalled. Earlier entries in this file that mention Claude or Cerebras describe work that has since been removed.
+
+- [x] **Second independent review plus full browser click-through (2026-10-24).**
+  - The read-only subagent reviewed the LLM provider, failover and orchestrator code and reported 8 findings. All 8 were checked and fixed, each with a regression test:
+    1. A Gemini daily quota now fails fast on the `PerDay` quota id as well as on a long `retryDelay`.
+    2. A malformed provider reply (non-JSON body, wrong shape) is now `LLMError("bad_response")`. It fails over and keeps the earlier `llm_failover` events in the audit trail, where before they were lost to an uncaught exception.
+    3. `runs.model` lists only models that actually answered; it is "none answered" when every provider failed. The planned chain goes in the `context` event.
+    4. Generated tool-call ids are unique across turns, using a per-provider counter.
+    5. **Verified live:** Gemini 3 returns HTTP 400 "Function call is missing a thought_signature" for calls written by another provider, and HTTP 200 with Google's placeholder `skip_thought_signature_validator`. Foreign turns now carry the placeholder.
+    6. Runs interrupted by a restart are closed through the same failure path, so the ticket is escalated (or flagged `customer_not_notified`).
+    7. Groq's `tool_use_failed` error code is retried, like "tool call validation failed".
+    8. `AGENT_ENGINE=auto` follows `LLM_PROVIDERS`. `POST /messages` checks the engine *before* storing the message, so a 400 cannot leave a stored message that a retry would duplicate.
+  - The click-through covered every page at 1440 px and 375 px:
+    - TKT-1001 run live from the UI on Gemini: resolved, transaction card changed state, ledger row, reply with the real ETA.
+    - TKT-1002 approved from the queue.
+    - TKT-1004 clarified, then resolved through the composer.
+    - A new case typed by hand (Chai Point, successful payment) was escalated as `merchant_dispute` with no refund.
+    - Overview numbers matched the actions taken. No console errors other than 502s during backend restarts.
+  - **Five UI bugs found in the click-through and fixed:**
+    1. After a queue decision the card vanished with no feedback. A status banner now says what happened.
+    2. "Send as customer" ignored the engine dropdown. The follow-up run now uses it (API test added).
+    3. The long engine label overflowed the top bar on phones.
+    4. The failure-injection table wasn't inside the scroll wrapper.
+    5. The Cases grid columns couldn't shrink.
+  - All pages are now 375/375 wide on mobile.
 
 ### Blocked / pending
 - [x] **Groq live (2026-10-24, free tier, `openai/gpt-oss-120b`, confirmed on the key's `/models` list):**
