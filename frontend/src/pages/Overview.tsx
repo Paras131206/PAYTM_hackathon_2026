@@ -370,9 +370,6 @@ export function Overview({ version }: { version: number }) {
         </section>
       )}
 
-      <div className="footnote small muted">
-        Definitions (numerator, denominator, window, source) are in steps.md §11. All data is verified from the local SQLite store.
-      </div>
     </div>
   );
 }
