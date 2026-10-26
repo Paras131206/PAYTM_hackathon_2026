@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ResolvLogo, IconArrowRight, IconSparkles, IconCheck } from "../components/PaytmIcons";
+import { ResolvLogo, IconArrowRight, IconCheck } from "../components/PaytmIcons";
 import type { Health } from "../types";
 
 interface LandingProps {
@@ -57,12 +57,7 @@ export function Landing({ onProceed, theme, onToggleTheme }: LandingProps) {
       {/* Hero Section */}
       <section className="landing-hero-section">
         <div className="landing-hero-container">
-          {/* Track 3 Pill Badge */}
-          <div className="hero-pill-badge">
-            <span className="sparkle-icon"><IconSparkles /></span>
-            <span className="badge-text">Track 3: Autonomous AI Teammates</span>
-            <span className="status-live-dot" />
-          </div>
+
 
           <h1 className="landing-hero-title">
             Autonomous AI Support for <br />
@@ -137,30 +132,7 @@ export function Landing({ onProceed, theme, onToggleTheme }: LandingProps) {
         </div>
       </section>
 
-      {/* Key Metrics Strip */}
-      <section className="landing-metrics-strip">
-        <div className="metrics-strip-inner">
-          <div className="metric-item">
-            <span className="metric-val">&lt; 1s</span>
-            <span className="metric-lbl">Autonomous Decision Speed</span>
-          </div>
-          <div className="metric-divider" />
-          <div className="metric-item">
-            <span className="metric-val">100%</span>
-            <span className="metric-lbl">Deterministic Policy Guardrail</span>
-          </div>
-          <div className="metric-divider" />
-          <div className="metric-item">
-            <span className="metric-val">₹2,000</span>
-            <span className="metric-lbl">Auto-Refund Approval Cap</span>
-          </div>
-          <div className="metric-divider" />
-          <div className="metric-item">
-            <span className="metric-val">0 Risk</span>
-            <span className="metric-lbl">Sandboxed Rails & Switch</span>
-          </div>
-        </div>
-      </section>
+
 
       {/* 4 Pillars of Resolv */}
       <section className="landing-features-section">
