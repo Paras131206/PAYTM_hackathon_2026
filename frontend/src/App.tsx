@@ -9,7 +9,6 @@ import {
   IconRefresh,
   IconSales,
   IconSparkles,
-  IconSystem,
   RobotMascot,
 } from "./components/PaytmIcons";
 import { Cases } from "./pages/Cases";
@@ -19,7 +18,6 @@ import { Marketing } from "./pages/Marketing";
 import { Overview } from "./pages/Overview";
 import { Queue } from "./pages/Queue";
 import { Sales } from "./pages/Sales";
-import { System } from "./pages/System";
 
 import type { Health } from "./types";
 
@@ -107,7 +105,6 @@ export default function App() {
     { id: "marketing", label: "Marketing", icon: IconMarketing },
     { id: "queue", label: "Human queue", icon: IconQueue, count: pending },
     { id: "execution", label: "Agent execution", icon: IconExecution },
-    { id: "system", label: "System", icon: IconSystem },
   ];
 
   if (page === "landing" && !deviceFrame) {
@@ -167,13 +164,6 @@ export default function App() {
           })}
         </div>
 
-        <div className="nav-foot">
-          <div className="paytm-pill-tag">
-            <span className="dot ok-dot" />
-            <span>Sandbox Rails Active</span>
-          </div>
-          <span className="disclaimer">Track 3 · Autonomous AI Teammates</span>
-        </div>
       </nav>
 
       {/* Main Content Area */}
@@ -261,7 +251,6 @@ export default function App() {
               onChange={refresh}
             />
           )}
-          {page === "system" && <System onChange={refresh} />}
         </main>
 
 
