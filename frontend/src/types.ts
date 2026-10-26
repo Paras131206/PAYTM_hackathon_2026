@@ -184,3 +184,144 @@ export interface SystemInfo {
   tools: { name: string; permission: string; integration: string; description: string }[];
   faults: { adapter: string; target: string; mode: string }[];
 }
+
+export interface RecommendationItem {
+  title: string;
+  channel?: string;
+  action: string;
+  rationale: string;
+  expected_impact: string;
+  effort: string;
+  timeline: string;
+}
+
+export interface AgentTraceStep {
+  step: string;
+  detail: string;
+}
+
+export interface SalesCategory {
+  category: string;
+  orders: number;
+  gross_sales_paise: number;
+  share_pct: number;
+}
+
+export interface SalesChannel {
+  channel: string;
+  orders: number;
+  gross_sales_paise: number;
+  failed_orders: number;
+}
+
+export interface SalesDaily {
+  date: string;
+  orders: number;
+  gross_sales_paise: number;
+  failed_orders: number;
+}
+
+export interface SalesOverview {
+  merchant: string;
+  total_orders: number;
+  gross_sales_paise: number;
+  net_sales_paise: number;
+  avg_order_value_paise: number;
+  failed_orders: number;
+  refunded_amount_paise: number;
+  payment_success_rate_pct: number;
+  categories: SalesCategory[];
+  channels: SalesChannel[];
+  daily_trend: SalesDaily[];
+  recent_transactions: Transaction[];
+}
+
+export interface SalesAnalysis {
+  report_title: string;
+  executive_summary: string;
+  prompt: string;
+  merchant: string;
+  key_metrics: {
+    gross_sales_rs: number;
+    total_orders: number;
+    avg_order_value_rs: number;
+    success_rate_pct: number;
+    failed_orders: number;
+    refunded_amount_rs: number;
+  };
+  findings: string[];
+  recommendations: RecommendationItem[];
+  agent_trace: AgentTraceStep[];
+  engine: string;
+  timestamp: string;
+}
+
+export interface MarketingCampaign {
+  id: string;
+  merchant: string;
+  channel: string;
+  campaign_name: string;
+  spend_paise: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue_generated_paise: number;
+  target_audience: string;
+  status: string;
+  roas: number;
+  cac_paise: number;
+  ctr_pct: number;
+  cvr_pct: number;
+  efficiency: "exceptional" | "good" | "moderate" | "underperforming";
+}
+
+export interface BudgetShift {
+  from_channel: string;
+  to_channel: string;
+  amount_rs: number;
+  reason: string;
+}
+
+export interface BudgetSimulation {
+  current_spend_rs: number;
+  current_revenue_rs: number;
+  current_roas: number;
+  projected_revenue_rs: number;
+  projected_roas: number;
+  revenue_growth_pct: number;
+  shifts: BudgetShift[];
+}
+
+export interface MarketingOverview {
+  merchant: string;
+  total_spend_paise: number;
+  total_revenue_paise: number;
+  total_conversions: number;
+  total_impressions: number;
+  total_clicks: number;
+  blended_roas: number;
+  average_cac_paise: number;
+  campaigns: MarketingCampaign[];
+}
+
+export interface MarketingAnalysis {
+  report_title: string;
+  executive_summary: string;
+  prompt: string;
+  merchant: string;
+  key_metrics: {
+    total_spend_rs: number;
+    total_revenue_rs: number;
+    blended_roas: number;
+    avg_cac_rs: number;
+    total_conversions: number;
+  };
+  campaigns: MarketingCampaign[];
+  budget_reallocation_simulation: BudgetSimulation;
+  findings: string[];
+  recommendations: RecommendationItem[];
+  agent_trace: AgentTraceStep[];
+  engine: string;
+  timestamp: string;
+}
+

@@ -129,13 +129,48 @@ HISTORY = [
 
 FAULTS = [("payment_switch", "UPI4021000501", "outage")]
 
+MERCHANT_SALES = [
+    # id, merchant, days_ago, category, channel, orders, gross_rs, net_rs, aov_rs, failed_orders, refunded_rs
+    ("SLS-001", "Sharma Kirana Store", 0, "Grocery & Essentials", "Paytm Soundbox In-Store QR", 142, 68400, 66150, 482, 4, 1800),
+    ("SLS-002", "Sharma Kirana Store", 1, "Grocery & Essentials", "Paytm Soundbox In-Store QR", 138, 64200, 62850, 465, 3, 1350),
+    ("SLS-003", "Sharma Kirana Store", 2, "Grocery & Essentials", "Paytm Soundbox In-Store QR", 155, 74100, 72300, 478, 5, 1800),
+    ("SLS-004", "Sharma Kirana Store", 3, "Grocery & Essentials", "Paytm Soundbox In-Store QR", 129, 59800, 58450, 464, 2, 900),
+    ("SLS-005", "Sharma Kirana Store", 4, "Dairy & Packaged Foods", "Online Payment Gateway", 64, 38400, 37200, 600, 2, 1200),
+    ("SLS-006", "Sharma Kirana Store", 5, "Dairy & Packaged Foods", "Online Payment Gateway", 58, 33640, 33040, 580, 1, 600),
+    ("SLS-007", "Sharma Kirana Store", 6, "Grocery & Essentials", "Paytm Soundbox In-Store QR", 168, 81600, 79350, 486, 6, 2250),
+    ("SLS-008", "Croma Electronics", 0, "Electronics & Gadgets", "Paytm EDC / Card Terminal", 48, 412000, 395000, 8583, 2, 17000),
+    ("SLS-009", "Croma Electronics", 1, "Electronics & Gadgets", "Online Payment Gateway", 35, 298000, 289500, 8514, 1, 8500),
+    ("SLS-010", "Croma Electronics", 2, "Home Appliances", "Paytm EDC / Card Terminal", 28, 345000, 345000, 12321, 0, 0),
+    ("SLS-011", "Croma Electronics", 3, "Mobile Phones", "Paytm Soundbox In-Store QR", 52, 546000, 529000, 10500, 2, 17000),
+    ("SLS-012", "Chai Point", 0, "Beverages & Snacks", "Paytm Soundbox In-Store QR", 320, 38400, 38160, 120, 2, 240),
+    ("SLS-013", "Chai Point", 1, "Beverages & Snacks", "Paytm Soundbox In-Store QR", 295, 35400, 35160, 120, 2, 240),
+    ("SLS-014", "Chai Point", 2, "Beverages & Snacks", "Paytm Soundbox In-Store QR", 340, 40800, 40440, 120, 3, 360),
+    ("SLS-015", "Big Bazaar", 0, "Supermarket & FMCG", "Paytm Soundbox In-Store QR", 210, 189000, 185100, 900, 6, 3900),
+    ("SLS-016", "Big Bazaar", 1, "Supermarket & FMCG", "Paytm Soundbox In-Store QR", 195, 175500, 172900, 900, 4, 2600),
+    ("SLS-017", "Zomato", 0, "Food Delivery", "Online Payment Gateway", 450, 180000, 177600, 400, 6, 2400),
+    ("SLS-018", "Reliance Digital", 0, "Laptops & Tablets", "Online Payment Gateway", 22, 330000, 315000, 15000, 1, 15000),
+]
+
+MARKETING_CAMPAIGNS = [
+    # id, merchant, channel, campaign_name, spend_rs, impressions, clicks, conversions, revenue_rs, target_audience, status, days_ago_start, days_ago_end
+    ("MKT-001", "Sharma Kirana Store", "TV Ads", "Regional Cable & Prime TV Spot", 180000, 850000, 2800, 280, 196000, "Mass TV Audience (All Age Groups)", "active", 30, 0),
+    ("MKT-002", "Sharma Kirana Store", "Meta Ads (Instagram & FB)", "Gen-Z Quick Groceries & Deals Reels", 65000, 540000, 26500, 1480, 312000, "Gen Z & Millennials (18-28 yrs)", "active", 30, 0),
+    ("MKT-003", "Sharma Kirana Store", "Paytm In-App & Soundbox", "Paytm Cashback & Soundbox Audio Promo", 35000, 310000, 18200, 890, 185000, "Daily Local Shoppers & UPI Users", "active", 30, 0),
+    ("MKT-004", "Sharma Kirana Store", "Google Performance Max", "Local Neighborhood Grocery Search", 45000, 180000, 14000, 620, 155000, "High Intent Search Shoppers (25-50)", "active", 30, 0),
+    ("MKT-005", "Sharma Kirana Store", "Influencer Collabs", "Campus Food Vloggers & Snack Reviews", 25000, 290000, 19400, 580, 108000, "College Students & Gen-Z (17-24 yrs)", "active", 25, 0),
+    ("MKT-006", "Sharma Kirana Store", "WhatsApp & SMS", "Weekly VIP Customer Basket Discounts", 15000, 95000, 8200, 390, 62000, "Loyalty Existing Customers", "active", 20, 0),
+    # Additional merchant campaigns
+    ("MKT-007", "Croma Electronics", "Meta Ads (Instagram & FB)", "Festival Tech Upgrade Reels", 120000, 980000, 42000, 2100, 950000, "Tech Enthusiasts & Young Pros (22-35)", "active", 30, 0),
+    ("MKT-008", "Croma Electronics", "TV Ads", "Mega Festival Electronics Blitz", 350000, 1400000, 4500, 410, 420000, "Broad Television Households", "active", 30, 0),
+]
+
 
 def reset() -> None:
     db.init_db()
     now = utcnow()
     with db.tx() as c:
         for table in ("events", "handoffs", "refunds", "messages", "runs", "tickets", "transactions",
-                      "customers", "policies", "sandbox_faults"):
+                      "customers", "policies", "sandbox_faults", "merchant_sales", "marketing_campaigns"):
             c.execute(f"DELETE FROM {table}")
         c.execute("DELETE FROM sqlite_sequence")
         for p in POLICIES:
@@ -171,6 +206,22 @@ def reset() -> None:
                       (tkt, "customer", cid, body, ts))
         for adapter, target, mode in FAULTS:
             c.execute("INSERT INTO sandbox_faults VALUES (?,?,?)", (adapter, target, mode))
+        for sid, merch, days_ago, cat, chan, ords, gross, net, aov, fails, ref_rs in MERCHANT_SALES:
+            d_str = iso(now - timedelta(days=days_ago))[:10]
+            c.execute(
+                "INSERT INTO merchant_sales (id, merchant, date, category, channel, orders_count, gross_sales_paise,"
+                " net_sales_paise, avg_order_value_paise, failed_orders_count, refunded_amount_paise) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (sid, merch, d_str, cat, chan, ords, gross * 100, net * 100, aov * 100, fails, ref_rs * 100),
+            )
+        for mid, merch, chan, cname, spend, imp, clk, conv, rev, aud, st, d_start, d_end in MARKETING_CAMPAIGNS:
+            c.execute(
+                "INSERT INTO marketing_campaigns (id, merchant, channel, campaign_name, spend_paise, impressions,"
+                " clicks, conversions, revenue_generated_paise, target_audience, status, start_date, end_date) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (mid, merch, chan, cname, spend * 100, imp, clk, conv, rev * 100, aud, st,
+                 iso(now - timedelta(days=d_start)), iso(now - timedelta(days=d_end))),
+            )
 
 
 if __name__ == "__main__":

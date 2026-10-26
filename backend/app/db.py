@@ -116,7 +116,36 @@ CREATE TABLE IF NOT EXISTS sandbox_faults (
     mode TEXT NOT NULL,                  -- outage | timeout
     PRIMARY KEY (adapter, target)
 );
+CREATE TABLE IF NOT EXISTS merchant_sales (
+    id TEXT PRIMARY KEY,
+    merchant TEXT NOT NULL,
+    date TEXT NOT NULL,
+    category TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    orders_count INTEGER NOT NULL,
+    gross_sales_paise INTEGER NOT NULL,
+    net_sales_paise INTEGER NOT NULL,
+    avg_order_value_paise INTEGER NOT NULL,
+    failed_orders_count INTEGER NOT NULL DEFAULT 0,
+    refunded_amount_paise INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS marketing_campaigns (
+    id TEXT PRIMARY KEY,
+    merchant TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    campaign_name TEXT NOT NULL,
+    spend_paise INTEGER NOT NULL,
+    impressions INTEGER NOT NULL,
+    clicks INTEGER NOT NULL,
+    conversions INTEGER NOT NULL,
+    revenue_generated_paise INTEGER NOT NULL,
+    target_audience TEXT NOT NULL,
+    status TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL
+);
 """
+
 
 
 def connect() -> sqlite3.Connection:
