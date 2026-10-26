@@ -137,11 +137,7 @@ export function Landing({ onProceed, theme, onToggleTheme }: LandingProps) {
       <section className="landing-features-section">
         <div className="features-container">
           <div className="section-header text-center">
-            <span className="section-eyebrow">BUILT FOR SCALE</span>
             <h2 className="section-title">How Resolv Works as an Autonomous Teammate</h2>
-            <p className="section-subtitle">
-              Combining LLM natural language understanding with strictly deterministic banking policy guardrails.
-            </p>
           </div>
 
           <div className="features-grid">
