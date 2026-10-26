@@ -377,4 +377,22 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
   - Frontend production build (`npm run build`): passed cleanly with 0 errors.
   - End-to-end API and UI endpoints verified live on `http://localhost:5173`.
 
+### 17. Dedicated Agent Execution Tab & Layout Refinement (2026-10-26)
+
+- [x] **17.1 Removed Underlined Sections:**
+  - Removed topbar status pills (LLM model chain badge & synthetic data tag) from `frontend/src/App.tsx`.
+  - Removed sidebar footer tag (`• Sandbox Rails Active`) from `frontend/src/App.tsx`.
+- [x] **17.2 Dedicated Agent Execution Tab (`#/execution`):**
+  - Created `frontend/src/pages/Execution.tsx` with support case switcher, execution run switcher, live engine selector + run trigger, ticket context banner, and full scrollable execution timeline.
+  - Placed the new `Agent execution` nav tab directly between `Human queue` and `System` in the navigation hierarchy (exactly where the arrow indicated).
+- [x] **17.3 Cases Customer Thread Redirect Button:**
+  - Added `Agent Execution →` button in the Customer Thread header (`Cases.tsx`) linking directly to `#/execution/:ticketId/:runId`.
+  - Added run preview strip with quick link to the dedicated timeline.
+  - Streamlined Cases workspace into a clean 2-column layout (Customer Context & Transactions + Customer Thread) to eliminate clutter and give ample space to conversation history.
+- [x] **17.4 Verification:**
+  - `npm run build` compiles with 0 errors.
+  - 98/98 pytest tests pass.
+  - Dev server verified responsive at `http://localhost:5173`.
+
+
 
