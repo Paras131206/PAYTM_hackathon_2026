@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PaytmLogo, IconArrowRight, IconSparkles, IconCheck, RobotMascot } from "../components/PaytmIcons";
+import { ResolvLogo, IconArrowRight, IconSparkles, IconCheck, RobotMascot } from "../components/PaytmIcons";
 import type { Health } from "../types";
 
 interface LandingProps {
@@ -26,7 +26,7 @@ export function Landing({ onProceed, theme, onToggleTheme, health }: LandingProp
       <header className="landing-header">
         <div className="landing-header-inner">
           <div className="landing-logo-group">
-            <PaytmLogo />
+            <ResolvLogo />
           </div>
 
           <nav className="landing-nav-links" aria-label="Landing Navigation">
@@ -87,7 +87,7 @@ export function Landing({ onProceed, theme, onToggleTheme, health }: LandingProp
             <div className="coin-frame">
               <img
                 src="/paytm_rupee_coin.png"
-                alt="Paytm Rupee Gold Medallion with light blue center and gold rupee symbol"
+                alt="Resolv Rupee Gold Medallion with light blue center and gold rupee symbol"
                 className="coin-symbol-image"
               />
               <div className="coin-shine-sweep" aria-hidden="true" />
@@ -306,11 +306,7 @@ export function Landing({ onProceed, theme, onToggleTheme, health }: LandingProp
       <footer className="landing-footer">
         <div className="landing-footer-inner">
           <div className="footer-left">
-            <div className="paytm-brand-lockup">
-              <span className="paytm-pay">pay</span>
-              <span className="paytm-tm">tm</span>
-              <span className="paytm-product">resolv</span>
-            </div>
+            <ResolvLogo />
             <p className="footer-desc">
               Prototype for Paytm Hackathon 2026, Track 3 (Autonomous AI Teammates).
               All customer & transaction data is synthetic. Sandbox rails simulate real UPI switches.

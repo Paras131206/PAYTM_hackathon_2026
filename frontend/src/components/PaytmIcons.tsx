@@ -1,20 +1,19 @@
 import type { SVGProps } from "react";
 
-export function PaytmLogo({ className = "" }: { className?: string }) {
+export function ResolvLogo({ className = "" }: { className?: string }) {
   return (
-    <div className={`paytm-brand-lockup ${className}`} aria-label="Paytm UPI Resolv">
-      <div className="paytm-logo-text">
-        <span className="paytm-pay">pay</span>
-        <span className="paytm-tm">tm</span>
+    <div className={`resolv-brand-lockup ${className}`} aria-label="Resolv">
+      <div className="brand-mark-box" aria-hidden>R</div>
+      <div className="brand-titles">
+        <strong className="brand-app-name">Resolv</strong>
+        <small className="brand-app-sub">AI Support Teammate</small>
       </div>
-      <div className="paytm-upi-tag">
-        <span className="paytm-heart" aria-hidden>❤️</span>
-        <span className="paytm-upi">UPI</span>
-      </div>
-      <span className="paytm-divider" aria-hidden>|</span>
-      <span className="paytm-product">resolv</span>
     </div>
   );
+}
+
+export function PaytmLogo({ className = "" }: { className?: string }) {
+  return <ResolvLogo className={className} />;
 }
 
 export function RobotMascot({ size = 48, className = "" }: { size?: number; className?: string }) {

@@ -96,6 +96,27 @@ a:hover { filter: brightness(1.15); }
 code, .mono { font-family: var(--mono); font-size: 12px; }
 
 /* ---------- Brand & Header Elements ---------- */
+.resolv-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  user-select: none;
+}
+.resolv-brand-lockup .brand-app-name {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.15;
+}
+.resolv-brand-lockup .brand-app-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .paytm-brand-lockup {
   display: inline-flex;
   align-items: center;
