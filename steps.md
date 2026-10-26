@@ -351,13 +351,30 @@ Demo metrics after running all 8 scenarios on the rules engine and approving S2 
 - [!] `google-genai` SDK not installed: PyPI timed out from this network, so a REST adapter is used instead (see requirements.md).
 - [ ] "Real data": real UPI transaction data is not obtainable (it is private to banks and NPCI). The proposed alternative is to calibrate the synthetic scenario mix to published NPCI/RBI statistics. This is waiting on the user's decision.
 - [ ] Planned, not built: ₹100/day compensation workflow, authentication, deployment, multilingual replies.
-- [x] **UI Theme & Layout Redesign (2026-10-24):**
-  - Integrated official Paytm branding (`#00BAF2` Paytm Cyan, `#002970` Paytm Navy, "paytm ♥️ UPI" lockup).
-  - Adopted modern AI assistant layout inspired by StudyGenie: vector AI mascot, circular progress gauges on performance metrics, and filter pills (`All`, `Actionable`, `Awaiting`, `Approval`, `Resolved`).
-  - Added dedicated Mobile Phone Prototype preview mode (interactive iPhone mockup frame with dynamic island and bottom navigation) alongside the responsive full-screen dashboard.
-  - Added ☀️ Light (Paytm web style) / 🌙 Dark (assistant dark style) theme toggle in the top bar.
-  - Added dropdown and collapsible view options for Performance Outcomes (Summary 4 gauges, Detailed 10 metrics, Operations only, or Collapsed) to prevent page clutter.
-  - Removed Paytm logo from top left brand header, replacing it with a clean Resolv mark and title.
-  - Fixed ticket prefix typo (`TCK-` to `TKT-`) across scenario cards and added auto-normalization in the Cases view.
-  - `npm run build` and backend pytest suite (95 tests) verified passing.
+### 16. Sales & Marketing AI Intelligence Tabs + Execution Scroll Containment (2026-10-26)
+
+- [x] **16.1 Database Schema & Seed Data:**
+  - Added `merchant_sales` table in `backend/app/db.py` (id, merchant, date, category, channel, orders_count, gross_sales_paise, net_sales_paise, avg_order_value_paise, failed_orders_count, refunded_amount_paise).
+  - Added `marketing_campaigns` table in `backend/app/db.py` (id, merchant, channel, campaign_name, spend_paise, impressions, clicks, conversions, revenue_generated_paise, target_audience, status, start_date, end_date).
+  - Seeded realistic synthetic data in `backend/app/seed.py` for multiple merchants ("Sharma Kirana Store", "Croma Electronics", etc.), including TV Ads vs Meta Ads/Reels, Paytm Soundbox promos, and Google Search campaigns.
+- [x] **16.2 Intelligence Service & API Endpoints:**
+  - Created `backend/app/intelligence.py` with SQL data aggregation and AI agent reasoning (evaluates ROAS, CAC, conversion leakage, and budget reallocation blueprints).
+  - Added typed API endpoints in `backend/app/api.py`:
+    - `GET /api/merchants`
+    - `GET /api/sales/overview` & `POST /api/sales/analyze`
+    - `GET /api/marketing/overview` & `POST /api/marketing/analyze`
+  - Created `backend/tests/test_intelligence.py`. 98/98 pytest tests passing.
+- [x] **16.3 Frontend Pages & Navigation:**
+  - Updated `frontend/src/types.ts` and `frontend/src/api.ts` with typed intelligence models.
+  - Added `IconSales` and `IconMarketing` in `frontend/src/components/PaytmIcons.tsx`.
+  - Created `frontend/src/pages/Sales.tsx` with GMV KPI cards, category/channel breakdown, and interactive AI Sales Agent report generator.
+  - Created `frontend/src/pages/Marketing.tsx` with ad spend ROI metrics, campaigns table, and interactive AI Marketing Advisor (budget reallocation, Gen-Z channel suggestions).
+  - Added Sales and Marketing tabs in `frontend/src/App.tsx` (desktop sidebar & mobile bottom nav).
+- [x] **16.4 Agent Execution Scrollability Fix:**
+  - Updated `.run-card` and `.timeline` in `frontend/src/styles.css` with flexbox containment, sticky header/meta-bar, max-height boundary (`calc(100vh - 165px)` on desktop, 480px on mobile mockup), and custom slim scrollbar (`overflow-y: auto`). The agent execution section never overflows or stretches out of the web page.
+- [x] **16.5 Verification:**
+  - Backend pytest: 98 passed in 2.17s.
+  - Frontend production build (`npm run build`): passed cleanly with 0 errors.
+  - End-to-end API and UI endpoints verified live on `http://localhost:5173`.
+
 

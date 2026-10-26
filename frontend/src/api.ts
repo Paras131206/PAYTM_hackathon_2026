@@ -1,5 +1,6 @@
 import type {
-  Customer, Engine, Handoff, Health, Metrics, RunDetail, SystemInfo, TicketDetail, TicketListItem,
+  Customer, Engine, Handoff, Health, MarketingAnalysis, MarketingOverview, Metrics,
+  RunDetail, SalesAnalysis, SalesOverview, SystemInfo, TicketDetail, TicketListItem,
 } from "./types";
 
 export class ApiError extends Error {
@@ -54,4 +55,14 @@ export const api = {
   setFault: (adapter: string, target: string, mode: "outage" | "timeout" | null) =>
     post<SystemInfo["faults"]>("/api/sandbox/faults", { adapter, target, mode }),
   reset: () => post<{ status: string }>("/api/demo/reset", {}),
+  merchants: () => request<string[]>("/api/merchants"),
+  salesOverview: (merchant?: string) =>
+    request<SalesOverview>(`/api/sales/overview${merchant ? `?merchant=${encodeURIComponent(merchant)}` : ""}`),
+  analyzeSales: (merchant: string, prompt: string) =>
+    post<SalesAnalysis>("/api/sales/analyze", { merchant, prompt }),
+  marketingOverview: (merchant?: string) =>
+    request<MarketingOverview>(`/api/marketing/overview${merchant ? `?merchant=${encodeURIComponent(merchant)}` : ""}`),
+  analyzeMarketing: (merchant: string, prompt: string) =>
+    post<MarketingAnalysis>("/api/marketing/analyze", { merchant, prompt }),
 };
+

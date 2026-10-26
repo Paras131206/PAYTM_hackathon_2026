@@ -10,7 +10,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import context as ctxsvc
-from . import db, handoffs, metrics, seed
+from . import db, handoffs, intelligence, metrics, seed
 from .agent import orchestrator
 from .agent.providers import chain_label, configured_chain, model_of, provider_configured
 from .config import iso, settings, utcnow
@@ -33,6 +33,11 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_me
 
 class _Body(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class AnalyzeRequest(_Body):
+    merchant: str = Field(default="Sharma Kirana Store", min_length=1, max_length=100)
+    prompt: str = Field(default="", max_length=1000)
 
 
 class RunRequest(_Body):
@@ -252,3 +257,29 @@ def reset_demo() -> dict:
         raise HTTPException(409, "Wait for running agent runs to finish before resetting.")
     seed.reset()
     return {"status": "reset", "time": iso(utcnow())}
+
+
+@app.get("/api/merchants")
+def get_merchants() -> list[str]:
+    return intelligence.get_merchants()
+
+
+@app.get("/api/sales/overview")
+def get_sales_overview(merchant: str | None = None) -> dict:
+    return intelligence.get_sales_overview(merchant)
+
+
+@app.post("/api/sales/analyze")
+def analyze_sales(req: AnalyzeRequest) -> dict:
+    return intelligence.analyze_sales(req.merchant, req.prompt)
+
+
+@app.get("/api/marketing/overview")
+def get_marketing_overview(merchant: str | None = None) -> dict:
+    return intelligence.get_marketing_overview(merchant)
+
+
+@app.post("/api/marketing/analyze")
+def analyze_marketing(req: AnalyzeRequest) -> dict:
+    return intelligence.analyze_marketing(req.merchant, req.prompt)
+

@@ -4,17 +4,22 @@ import { Badge, EngineBadge } from "./components/ui";
 import {
   IconCases,
   IconHome,
+  IconMarketing,
   IconQueue,
   IconRefresh,
+  IconSales,
   IconSparkles,
   IconSystem,
   RobotMascot,
 } from "./components/PaytmIcons";
 import { Cases } from "./pages/Cases";
 import { Landing } from "./pages/Landing";
+import { Marketing } from "./pages/Marketing";
 import { Overview } from "./pages/Overview";
 import { Queue } from "./pages/Queue";
+import { Sales } from "./pages/Sales";
 import { System } from "./pages/System";
+
 import type { Health } from "./types";
 
 function useHashRoute(): string[] {
@@ -92,6 +97,8 @@ export default function App() {
     { id: "landing", label: "Home", icon: IconHome },
     { id: "overview", label: "Overview", icon: IconSparkles },
     { id: "cases", label: "Cases", icon: IconCases },
+    { id: "sales", label: "Sales", icon: IconSales },
+    { id: "marketing", label: "Marketing", icon: IconMarketing },
     { id: "queue", label: "Human queue", icon: IconQueue, count: pending },
     { id: "system", label: "System", icon: IconSystem },
   ];
@@ -236,9 +243,12 @@ export default function App() {
           )}
           {page === "overview" && <Overview version={version} />}
           {page === "cases" && <Cases ticketId={param ?? null} health={health} onChange={refresh} />}
+          {page === "sales" && <Sales />}
+          {page === "marketing" && <Marketing />}
           {page === "queue" && <Queue onChange={refresh} />}
           {page === "system" && <System onChange={refresh} />}
         </main>
+
 
         {/* Mobile / Prototype Bottom Navigation Bar */}
         <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
