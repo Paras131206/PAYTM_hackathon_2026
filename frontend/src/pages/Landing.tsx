@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ResolvLogo, IconArrowRight, IconSparkles, IconCheck, RobotMascot } from "../components/PaytmIcons";
+import { ResolvLogo, IconArrowRight, IconSparkles, IconCheck } from "../components/PaytmIcons";
 import type { Health } from "../types";
 
 interface LandingProps {
@@ -9,7 +9,7 @@ interface LandingProps {
   health?: Health | null;
 }
 
-export function Landing({ onProceed, theme, onToggleTheme, health }: LandingProps) {
+export function Landing({ onProceed, theme, onToggleTheme }: LandingProps) {
   const [coinHover, setCoinHover] = useState(false);
 
   return (
@@ -60,7 +60,7 @@ export function Landing({ onProceed, theme, onToggleTheme, health }: LandingProp
           {/* Track 3 Pill Badge */}
           <div className="hero-pill-badge">
             <span className="sparkle-icon"><IconSparkles /></span>
-            <span className="badge-text">Paytm Hackathon 2026 · Track 3: Autonomous AI Teammates</span>
+            <span className="badge-text">Track 3: Autonomous AI Teammates</span>
             <span className="status-live-dot" />
           </div>
 
@@ -133,25 +133,6 @@ export function Landing({ onProceed, theme, onToggleTheme, health }: LandingProp
                 <span className="proceed-arrow"><IconArrowRight /></span>
               </span>
             </button>
-
-            <a
-              href="#/cases"
-              className="btn-secondary-hero"
-              onClick={(e) => {
-                e.preventDefault();
-                location.hash = "#/cases";
-              }}
-            >
-              <span>Explore 8 Live Test Cases</span>
-            </a>
-          </div>
-
-          {/* Teammate status pill */}
-          <div className="hero-teammate-status">
-            <RobotMascot size={26} />
-            <span className="status-label">
-              Teammate Status: <strong>Ready</strong> · Engine: <strong>{health?.engine ?? "rules"}</strong>
-            </span>
           </div>
         </div>
       </section>
