@@ -164,7 +164,7 @@ export default function App() {
             <span className="dot ok-dot" />
             <span>Sandbox Rails Active</span>
           </div>
-          <span className="disclaimer">Paytm Hackathon 2026 · Track 3</span>
+          <span className="disclaimer">Track 3 · Autonomous AI Teammates</span>
         </div>
       </nav>
 
@@ -280,7 +280,7 @@ export default function App() {
       <div className="device-preview-wrapper">
         <div className="device-controls-bar">
           <div className="preview-label">
-            <strong>Paytm Resolv</strong> · Mobile Prototype View
+            <strong>Resolv</strong> · Mobile Prototype View
           </div>
           <button className="btn sm primary" onClick={() => setDeviceFrame(false)}>
             Exit Phone View (Expand Full Screen)

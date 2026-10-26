@@ -179,7 +179,7 @@ export function Landing({ onProceed, theme, onToggleTheme }: LandingProps) {
               <div className="feature-icon-box">🔍</div>
               <h3>1. Intent & Context Discovery</h3>
               <p>
-                Extracts the transaction reference, amount, and customer grievance from conversational support tickets. Automatically correlates against Paytm payment history.
+                Extracts the transaction reference, amount, and customer grievance from conversational support tickets. Automatically correlates against UPI payment history.
               </p>
               <ul className="feature-checklist">
                 <li><IconCheck /> Multi-turn conversation parsing</li>
@@ -288,10 +288,6 @@ export function Landing({ onProceed, theme, onToggleTheme }: LandingProps) {
         <div className="landing-footer-inner">
           <div className="footer-left">
             <ResolvLogo />
-            <p className="footer-desc">
-              Prototype for Paytm Hackathon 2026, Track 3 (Autonomous AI Teammates).
-              All customer & transaction data is synthetic. Sandbox rails simulate real UPI switches.
-            </p>
           </div>
 
           <div className="footer-right">
