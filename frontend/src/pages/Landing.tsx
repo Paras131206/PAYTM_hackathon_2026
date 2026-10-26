@@ -33,7 +33,6 @@ export function Landing({ onProceed, theme, onToggleTheme }: LandingProps) {
             <a href="#/overview" onClick={(e) => { e.preventDefault(); onProceed(); }}>Overview</a>
             <a href="#/cases" onClick={(e) => { e.preventDefault(); location.hash = "#/cases"; }}>Live Cases</a>
             <a href="#/queue" onClick={(e) => { e.preventDefault(); location.hash = "#/queue"; }}>Human Queue</a>
-            <a href="#/system" onClick={(e) => { e.preventDefault(); location.hash = "#/system"; }}>Switch Sandbox</a>
           </nav>
 
           <div className="landing-header-actions">
