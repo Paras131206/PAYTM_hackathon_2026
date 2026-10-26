@@ -6,17 +6,19 @@ import {
   IconHome,
   IconQueue,
   IconRefresh,
+  IconSparkles,
   IconSystem,
   RobotMascot,
 } from "./components/PaytmIcons";
 import { Cases } from "./pages/Cases";
+import { Landing } from "./pages/Landing";
 import { Overview } from "./pages/Overview";
 import { Queue } from "./pages/Queue";
 import { System } from "./pages/System";
 import type { Health } from "./types";
 
 function useHashRoute(): string[] {
-  const read = () => (location.hash.replace(/^#\/?/, "") || "overview").split("/");
+  const read = () => (location.hash.replace(/^#\/?/, "") || "landing").split("/");
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const on = () => setRoute(read());
@@ -87,23 +89,37 @@ export default function App() {
   };
 
   const nav = [
-    { id: "overview", label: "Overview", icon: IconHome },
+    { id: "landing", label: "Home", icon: IconHome },
+    { id: "overview", label: "Overview", icon: IconSparkles },
     { id: "cases", label: "Cases", icon: IconCases },
     { id: "queue", label: "Human queue", icon: IconQueue, count: pending },
     { id: "system", label: "System", icon: IconSystem },
   ];
 
+  if (page === "landing" && !deviceFrame) {
+    return (
+      <Landing
+        onProceed={() => {
+          location.hash = "#/overview";
+        }}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        health={health}
+      />
+    );
+  }
+
   const appContent = (
     <div className={`shell ${deviceFrame ? "in-device" : ""}`}>
       {/* Desktop Sidebar Navigation */}
       <nav className="nav desktop-nav" aria-label="Main">
-        <div className="brand resolv-brand-header">
+        <a href="#/landing" className="brand resolv-brand-header" style={{ textDecoration: "none" }} title="Return to Landing Page">
           <div className="brand-mark-box" aria-hidden>R</div>
           <div className="brand-titles">
             <strong className="brand-app-name">Resolv</strong>
             <small className="brand-app-sub">AI Support Teammate</small>
           </div>
-        </div>
+        </a>
 
         {/* AI Assistant Mascot mini badge */}
         <div className="assistant-card">
@@ -148,10 +164,10 @@ export default function App() {
       {/* Main Content Area */}
       <div className="main">
         <header className="topbar">
-          <div className="mobile-brand-bar">
+          <a href="#/landing" className="mobile-brand-bar" style={{ textDecoration: "none" }} title="Return to Landing Page">
             <span className="brand-mark-box sm" aria-hidden>R</span>
             <strong className="brand-app-name">Resolv</strong>
-          </div>
+          </a>
 
           <div className="topbar-status-group">
             {health ? <EngineBadge engine={health.engine} model={health.model} /> : null}
@@ -164,6 +180,16 @@ export default function App() {
           <span className="spacer" />
 
           <div className="topbar-actions">
+            {/* Landing page link */}
+            <a
+              href="#/landing"
+              className="view-toggle-btn"
+              title="Return to Landing Page"
+              style={{ textDecoration: "none" }}
+            >
+              🪙 Landing
+            </a>
+
             {/* View mode toggle */}
             <button
               className="view-toggle-btn"
@@ -198,6 +224,16 @@ export default function App() {
         </header>
 
         <main className="content-scroll" key={resetCount}>
+          {page === "landing" && (
+            <Landing
+              onProceed={() => {
+                location.hash = "#/overview";
+              }}
+              theme={theme}
+              onToggleTheme={toggleTheme}
+              health={health}
+            />
+          )}
           {page === "overview" && <Overview version={version} />}
           {page === "cases" && <Cases ticketId={param ?? null} health={health} onChange={refresh} />}
           {page === "queue" && <Queue onChange={refresh} />}
