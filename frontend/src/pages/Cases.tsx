@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { Timeline } from "../components/Timeline";
 import {
   Badge, Empty, EngineBadge, ErrorBanner, SandboxBadge, StatusBadge, ago, rupees, when,
 } from "../components/ui";
+
 import {
   IconArrowRight,
   IconCases,
@@ -426,8 +426,18 @@ function Workspace({
         {/* Conversation Thread */}
         <section className="card thread-card" aria-label="Conversation">
           <div className="card-h">
-            <h2>Customer Thread</h2>
-            <span className="small muted">{detail.messages.length} messages</span>
+            <div>
+              <h2>Customer Thread</h2>
+              <span className="small muted">{detail.messages.length} messages</span>
+            </div>
+            <a
+              href={`#/execution/${detail.ticket.id}${runId ? `/${runId}` : ""}`}
+              className="btn sm primary pill-btn thread-execution-btn"
+              title="Open autonomous agent execution & timeline in dedicated tab"
+            >
+              <IconSparkles />
+              <span>Agent Execution →</span>
+            </a>
           </div>
 
           <div className="thread">
@@ -447,6 +457,25 @@ function Workspace({
               </div>
             ))}
           </div>
+
+          {/* Quick Execution Status Strip */}
+          {run && (
+            <div className="card-b row small thread-run-strip">
+              <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <span className="mono bold run-id-tag">Run #{run.run.id}</span>
+                <EngineBadge engine={run.run.engine} model={run.run.model} />
+                <StatusBadge status={run.run.status} />
+                {run.run.outcome && <span>→ <StatusBadge status={run.run.outcome} /></span>}
+                <span className="muted">{run.run.turns} turns</span>
+              </div>
+              <a
+                href={`#/execution/${detail.ticket.id}/${run.run.id}`}
+                className="banner-link small bold"
+              >
+                View Full Timeline &amp; Tool Trace →
+              </a>
+            </div>
+          )}
 
           <div className="card-b stack composer-box">
             <label className="small muted" htmlFor="composer">Simulate Customer Reply</label>
@@ -473,51 +502,11 @@ function Workspace({
             </div>
           </div>
         </section>
-
-        {/* Agent Run & Timeline */}
-        <section className="card run-card" aria-label="Agent run">
-          <div className="card-h">
-            <h2>Agent Execution</h2>
-            <div className="row">
-              {detail.runs.length > 1 && (
-                <select
-                  className="input run-selector"
-                  value={runId ?? ""}
-                  aria-label="Select run"
-                  onChange={(e) => setRunId(Number(e.target.value))}
-                >
-                  {detail.runs.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      Run #{r.id} · {r.engine} · {r.outcome ?? r.status}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          </div>
-
-          {run ? (
-            <>
-              <div className="card-b row small run-meta-bar">
-                <span className="mono run-id-tag">#{run.run.id}</span>
-                <EngineBadge engine={run.run.engine} model={run.run.model} />
-                <StatusBadge status={run.run.status} />
-                {run.run.outcome && <span>→ <StatusBadge status={run.run.outcome} /></span>}
-                <span className="muted">{run.run.turns} planner turns</span>
-                {run.run.error && <Badge tone="bad" title={run.run.error}>error</Badge>}
-              </div>
-              <Timeline events={run.events} />
-            </>
-          ) : (
-            <Empty>
-              No runs executed yet. Click <strong>Run Resolv →</strong> to start autonomous policy checks &amp; resolution.
-            </Empty>
-          )}
-        </section>
       </div>
     </div>
   );
 }
+
 
 function CustomerPanel({
   detail,

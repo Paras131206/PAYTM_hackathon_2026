@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
-import { Badge, EngineBadge } from "./components/ui";
 import {
   IconCases,
+  IconExecution,
   IconHome,
   IconMarketing,
   IconQueue,
@@ -13,6 +13,7 @@ import {
   RobotMascot,
 } from "./components/PaytmIcons";
 import { Cases } from "./pages/Cases";
+import { Execution } from "./pages/Execution";
 import { Landing } from "./pages/Landing";
 import { Marketing } from "./pages/Marketing";
 import { Overview } from "./pages/Overview";
@@ -22,8 +23,11 @@ import { System } from "./pages/System";
 
 import type { Health } from "./types";
 
-function useHashRoute(): string[] {
-  const read = () => (location.hash.replace(/^#\/?/, "") || "landing").split("/");
+function useHashRoute(): [string, string | null, string | null] {
+  const read = (): [string, string | null, string | null] => {
+    const parts = (location.hash.replace(/^#\/?/, "") || "landing").split("/");
+    return [parts[0] || "landing", parts[1] || null, parts[2] || null];
+  };
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const on = () => setRoute(read());
@@ -34,7 +38,9 @@ function useHashRoute(): string[] {
 }
 
 export default function App() {
-  const [page, param] = useHashRoute();
+
+  const [page, param, param2] = useHashRoute();
+
   const [health, setHealth] = useState<Health | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
@@ -100,6 +106,7 @@ export default function App() {
     { id: "sales", label: "Sales", icon: IconSales },
     { id: "marketing", label: "Marketing", icon: IconMarketing },
     { id: "queue", label: "Human queue", icon: IconQueue, count: pending },
+    { id: "execution", label: "Agent execution", icon: IconExecution },
     { id: "system", label: "System", icon: IconSystem },
   ];
 
@@ -117,6 +124,7 @@ export default function App() {
   }
 
   const appContent = (
+
     <div className={`shell ${deviceFrame ? "in-device" : ""}`}>
       {/* Desktop Sidebar Navigation */}
       <nav className="nav desktop-nav" aria-label="Main">
@@ -176,15 +184,14 @@ export default function App() {
             <strong className="brand-app-name">Resolv</strong>
           </a>
 
-          <div className="topbar-status-group">
-            {health ? <EngineBadge engine={health.engine} model={health.model} /> : null}
-            <Badge tone="warn" title="Customers, transactions and tickets are generated demo data">
-              synthetic data
-            </Badge>
-            {healthError && <Badge tone="bad">backend unreachable: {healthError}</Badge>}
-          </div>
+          {healthError && (
+            <span className="small text-bad" style={{ color: "var(--bad)", fontWeight: 600 }}>
+              Backend offline: {healthError}
+            </span>
+          )}
 
           <span className="spacer" />
+
 
           <div className="topbar-actions">
             {/* Landing page link */}
@@ -246,8 +253,17 @@ export default function App() {
           {page === "sales" && <Sales />}
           {page === "marketing" && <Marketing />}
           {page === "queue" && <Queue onChange={refresh} />}
+          {page === "execution" && (
+            <Execution
+              ticketId={param ?? null}
+              runIdParam={param2 ?? null}
+              health={health}
+              onChange={refresh}
+            />
+          )}
           {page === "system" && <System onChange={refresh} />}
         </main>
+
 
 
         {/* Mobile / Prototype Bottom Navigation Bar */}
